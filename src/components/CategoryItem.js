@@ -18,6 +18,9 @@ export default function CategoryItem({
       style={styles.container}
       onPress={onPress}
       activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`Danh mục ${category.name}`}
     >
       <View
         style={[

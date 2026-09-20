@@ -16,25 +16,25 @@ export default function PromoBanner() {
 
         <View style={styles.tag}>
           <Text style={styles.tagText}>
-            🔥 ƯU ĐÃI ĐẶC BIỆT
+            ⚡ DEAL CÔNG NGHỆ
           </Text>
         </View>
 
         <Text style={styles.title}>
-          Giảm đến
+          Nâng cấp góc máy
         </Text>
 
         <Text style={styles.discount}>
-          50%
+          -50%
         </Text>
 
         <Text style={styles.description}>
-          Cho đơn hàng đầu tiên
+          Ưu đãi laptop & phụ kiện
         </Text>
 
         <TouchableOpacity style={styles.button}>
           <Text style={styles.buttonText}>
-            Đặt ngay →
+            Xem ưu đãi →
           </Text>
         </TouchableOpacity>
 
@@ -43,14 +43,14 @@ export default function PromoBanner() {
       <View style={styles.right}>
 
         <View style={styles.circle}>
-          <Text style={styles.food}>
-            🍔
+          <Text style={styles.productEmoji}>
+            💻
           </Text>
         </View>
 
         <View style={styles.smallCircle}>
-          <Text style={styles.smallFood}>
-            🍟
+          <Text style={styles.accessoryEmoji}>
+            🎧
           </Text>
         </View>
 
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  food: {
+  productEmoji: {
     fontSize: 90,
     transform: [
       {
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  smallFood: {
+  accessoryEmoji: {
     fontSize: 35,
   },
 });

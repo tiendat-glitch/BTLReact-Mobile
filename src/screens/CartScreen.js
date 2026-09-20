@@ -59,7 +59,7 @@ export default function CartScreen({ navigation }) {
             </Text>
 
             <Text style={styles.emptyText}>
-              Hãy thêm món ăn yêu thích của bạn
+              Thêm sản phẩm bạn đang quan tâm vào giỏ hàng
             </Text>
 
             <TouchableOpacity
@@ -69,24 +69,24 @@ export default function CartScreen({ navigation }) {
               }
             >
               <Text style={styles.shopButtonText}>
-                Khám phá món ăn
+                Tiếp tục mua sắm
               </Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            <View style={styles.restaurantBox}>
-              <Text style={styles.restaurantEmoji}>
+            <View style={styles.storeBox}>
+              <Text style={styles.storeEmoji}>
                 🏪
               </Text>
 
               <View>
-                <Text style={styles.restaurantName}>
-                  Nhà hàng Foodie
+                <Text style={styles.storeName}>
+                  BTL Computer Store
                 </Text>
 
-                <Text style={styles.restaurantSub}>
-                  Giao hàng nhanh • 20-30 phút
+                <Text style={styles.storeSub}>
+                  Hàng chính hãng • Bảo hành đầy đủ
                 </Text>
               </View>
             </View>
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  restaurantBox: {
+  storeBox: {
     backgroundColor: colors.white,
     padding: 15,
     borderRadius: 16,
@@ -328,17 +328,17 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
-  restaurantEmoji: {
+  storeEmoji: {
     fontSize: 30,
     marginRight: 12,
   },
 
-  restaurantName: {
+  storeName: {
     fontSize: 15,
     fontWeight: "900",
   },
 
-  restaurantSub: {
+  storeSub: {
     fontSize: 11,
     color: colors.gray,
     marginTop: 4,

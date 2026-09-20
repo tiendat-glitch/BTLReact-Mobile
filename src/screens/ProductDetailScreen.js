@@ -10,16 +10,31 @@ import {
 import colors from "../constants/colors";
 import { useCart } from "../context/CartContext";
 
-export default function FoodDetailScreen({ route, navigation }) {
-  const { food } = route.params;
+export default function ProductDetailScreen({ route, navigation }) {
+  const { product } = route.params;
+  const item = product;
   const { addToCart } = useCart();
 
   const [quantity, setQuantity] = useState(1);
 
-  const total = food.price * quantity;
+  if (!item) {
+    return (
+      <View style={styles.errorState}>
+        <Text style={styles.errorTitle}>Không tải được sản phẩm</Text>
+        <Text style={styles.errorText}>
+          Vui lòng quay lại và thử chọn sản phẩm khác.
+        </Text>
+        <TouchableOpacity style={styles.errorButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.errorButtonText}>Quay lại</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const total = item.price * quantity;
 
   const handleAddToCart = () => {
-    addToCart(food, quantity);
+    addToCart(item, quantity);
     navigation.navigate("Cart");
   };
 
@@ -43,15 +58,15 @@ export default function FoodDetailScreen({ route, navigation }) {
             <Text style={styles.favoriteText}>♡</Text>
           </TouchableOpacity>
 
-          <Text style={styles.foodEmoji}>
-            {food.emoji}
+          <Text style={styles.productEmoji}>
+            {item.emoji}
           </Text>
 
           <View style={styles.discount}>
             <Text style={styles.discountText}>
               -{Math.round(
-                ((food.oldPrice - food.price) /
-                  food.oldPrice) *
+                ((item.oldPrice - item.price) /
+                  item.oldPrice) *
                   100
               )}%
             </Text>
@@ -63,17 +78,17 @@ export default function FoodDetailScreen({ route, navigation }) {
         <View style={styles.content}>
           <View style={styles.categoryTag}>
             <Text style={styles.categoryText}>
-              {food.category}
+              {item.category}
             </Text>
           </View>
 
           <Text style={styles.name}>
-            {food.name}
+            {item.name}
           </Text>
 
           <View style={styles.ratingRow}>
             <Text style={styles.rating}>
-              ★ {food.rating}
+              ★ {item.rating}
             </Text>
 
             <Text style={styles.separator}>
@@ -81,7 +96,7 @@ export default function FoodDetailScreen({ route, navigation }) {
             </Text>
 
             <Text style={styles.sold}>
-              Đã bán {food.sold}
+              Đã bán {item.sold}
             </Text>
 
             <Text style={styles.separator}>
@@ -89,7 +104,7 @@ export default function FoodDetailScreen({ route, navigation }) {
             </Text>
 
             <Text style={styles.delivery}>
-              🛵 {food.deliveryTime}
+              ✓ {item.deliveryTime}
             </Text>
           </View>
 
@@ -97,11 +112,11 @@ export default function FoodDetailScreen({ route, navigation }) {
 
           <View style={styles.priceRow}>
             <Text style={styles.price}>
-              {food.price.toLocaleString("vi-VN")}đ
+              {item.price.toLocaleString("vi-VN")}đ
             </Text>
 
             <Text style={styles.oldPrice}>
-              {food.oldPrice.toLocaleString("vi-VN")}đ
+              {item.oldPrice.toLocaleString("vi-VN")}đ
             </Text>
           </View>
 
@@ -110,27 +125,27 @@ export default function FoodDetailScreen({ route, navigation }) {
           {/* DESCRIPTION */}
 
           <Text style={styles.sectionTitle}>
-            Mô tả món ăn
+            Mô tả sản phẩm
           </Text>
 
           <Text style={styles.description}>
-            {food.description}
+            {item.description}
           </Text>
 
           {/* OPTIONS */}
 
           <Text style={styles.sectionTitle}>
-            Tùy chọn món
+            Thông số nổi bật
           </Text>
 
           <View style={styles.option}>
             <View>
               <Text style={styles.optionTitle}>
-                Phần ăn tiêu chuẩn
+                Cấu hình sản phẩm
               </Text>
 
               <Text style={styles.optionSub}>
-                Phù hợp cho 1 người
+                Thông tin được xác nhận bởi nhà sản xuất
               </Text>
             </View>
 
@@ -142,11 +157,11 @@ export default function FoodDetailScreen({ route, navigation }) {
           <View style={styles.option}>
             <View>
               <Text style={styles.optionTitle}>
-                Thêm sốt đặc biệt
+                Chính sách bảo hành
               </Text>
 
               <Text style={styles.optionSub}>
-                +5.000đ
+                Bảo hành chính hãng 24 tháng
               </Text>
             </View>
 
@@ -225,6 +240,39 @@ export default function FoodDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
+  errorState: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+
+  errorTitle: {
+    color: colors.text,
+    fontSize: 19,
+    fontWeight: "900",
+  },
+
+  errorText: {
+    color: colors.gray,
+    marginTop: 8,
+    textAlign: "center",
+  },
+
+  errorButton: {
+    backgroundColor: colors.primary,
+    borderRadius: colors.radius.sm,
+    marginTop: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+
+  errorButtonText: {
+    color: colors.white,
+    fontWeight: "800",
+  },
+
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -242,7 +290,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 
-  foodEmoji: {
+  productEmoji: {
     fontSize: 145,
   },
 
