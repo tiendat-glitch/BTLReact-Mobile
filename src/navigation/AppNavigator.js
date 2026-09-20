@@ -9,7 +9,7 @@ import {
 } from "@react-navigation/native-stack";
 
 import HomeScreen from "../screens/HomeScreen";
-import FoodDetailScreen from "../screens/FoodDetailScreen";
+import ProductDetailScreen from "../screens/ProductDetailScreen";
 import CartScreen from "../screens/CartScreen";
 import CheckoutScreen from "../screens/CheckoutScreen";
 
@@ -31,8 +31,8 @@ export default function AppNavigator() {
         />
 
         <Stack.Screen
-          name="FoodDetail"
-          component={FoodDetailScreen}
+          name="ProductDetail"
+          component={ProductDetailScreen}
         />
 
         <Stack.Screen

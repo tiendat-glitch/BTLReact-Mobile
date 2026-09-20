@@ -11,23 +11,33 @@ import {
 import SearchBar from "../components/SearchBar";
 import PromoBanner from "../components/PromoBanner";
 import CategoryItem from "../components/CategoryItem";
-import FoodCard from "../components/FoodCard";
+import ProductCard from "../components/ProductCard";
 
-import categoryData from "../data/categoryData";
-import foodData from "../data/foodData";
+import { getCatalogSnapshot } from "../data/catalogAdapter";
 
 import colors from "../constants/colors";
 import { useCart } from "../context/CartContext";
 
 export default function HomeScreen({ navigation }) {
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
+  const [query, setQuery] = useState("");
 
-  const { cart } = useCart();
+  const { products, categories } = getCatalogSnapshot();
+  const { cart, cartCount } = useCart();
 
-  const filteredFoods =
-    selectedCategory === "Tất cả"
-      ? foodData
-      : foodData.filter((food) => food.category === selectedCategory);
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredProducts = products.filter((product) => {
+    const matchesCategory =
+      selectedCategory === "Tất cả" ||
+      product.category === selectedCategory;
+    const matchesQuery =
+      !normalizedQuery ||
+      `${product.name} ${product.brand} ${product.category}`
+        .toLowerCase()
+        .includes(normalizedQuery);
+
+    return matchesCategory && matchesQuery;
+  });
 
   return (
     <View style={styles.container}>
@@ -39,22 +49,24 @@ export default function HomeScreen({ navigation }) {
 
         <View style={styles.header}>
           <View>
-            <Text style={styles.locationLabel}>📍 Giao đến</Text>
+            <Text style={styles.locationLabel}>CỬA HÀNG TRỰC TUYẾN</Text>
 
             <TouchableOpacity>
-              <Text style={styles.location}>Hoàn Kiếm, Hà Nội ▾</Text>
+              <Text style={styles.location}>BTL Computer Store ▾</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity
             style={styles.cartButton}
             onPress={() => navigation.navigate("Cart")}
+            accessibilityRole="button"
+            accessibilityLabel={`Mở giỏ hàng, ${cartCount} sản phẩm`}
           >
             <Text style={styles.cartIcon}>🛒</Text>
 
-            {cart.length > 0 && (
+            {cartCount > 0 && (
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{cart.length}</Text>
+                <Text style={styles.badgeText}>{cartCount}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -63,7 +75,7 @@ export default function HomeScreen({ navigation }) {
         {/* SEARCH */}
 
         <View style={styles.searchWrapper}>
-          <SearchBar />
+          <SearchBar value={query} onChangeText={setQuery} />
         </View>
 
         {/* BANNER */}
@@ -73,7 +85,7 @@ export default function HomeScreen({ navigation }) {
         {/* CATEGORY */}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Danh mục</Text>
+          <Text style={styles.sectionTitle}>Khám phá danh mục</Text>
 
           <Text style={styles.seeAll}>Xem tất cả</Text>
         </View>
@@ -83,7 +95,7 @@ export default function HomeScreen({ navigation }) {
           showsHorizontalScrollIndicator={false}
           style={styles.categoryList}
         >
-          {categoryData.map((category) => (
+          {categories.map((category) => (
             <CategoryItem
               key={category.id}
               category={category}
@@ -97,29 +109,39 @@ export default function HomeScreen({ navigation }) {
 
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionTitle}>Món ăn phổ biến 🔥</Text>
+            <Text style={styles.sectionTitle}>Sản phẩm nổi bật</Text>
 
             <Text style={styles.sectionSubTitle}>
-              Được nhiều người yêu thích
+              Lựa chọn tốt cho bạn hôm nay
             </Text>
           </View>
 
           <Text style={styles.seeAll}>Xem thêm</Text>
         </View>
 
-        <View style={styles.foodGrid}>
-          {filteredFoods.map((food) => (
-            <FoodCard
-              key={food.id}
-              food={food}
-              onPress={() =>
-                navigation.navigate("FoodDetail", {
-                  food,
-                })
-              }
-            />
-          ))}
-        </View>
+        {filteredProducts.length > 0 ? (
+          <View style={styles.productGrid}>
+            {filteredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onPress={() =>
+                  navigation.navigate("ProductDetail", {
+                    product,
+                  })
+                }
+              />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>⌕</Text>
+            <Text style={styles.emptyTitle}>Không tìm thấy sản phẩm</Text>
+            <Text style={styles.emptyText}>
+              Thử từ khóa khác hoặc chọn một danh mục khác.
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* BOTTOM NAVIGATION */}
@@ -128,13 +150,13 @@ export default function HomeScreen({ navigation }) {
         <TouchableOpacity style={styles.navItem}>
           <Text style={styles.activeIcon}>🏠</Text>
 
-          <Text style={styles.activeText}>Trang chủ</Text>
+          <Text style={styles.activeText}>Khám phá</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.navItem}>
           <Text style={styles.navIcon}>🏷️</Text>
 
-          <Text style={styles.navText}>Ưu đãi</Text>
+          <Text style={styles.navText}>Đơn hàng</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -144,7 +166,7 @@ export default function HomeScreen({ navigation }) {
           <View>
             <Text style={styles.navIcon}>🛒</Text>
 
-            {cart.length > 0 && <View style={styles.navBadge} />}
+            {cartCount > 0 && <View style={styles.navBadge} />}
           </View>
 
           <Text style={styles.navText}>Giỏ hàng</Text>
@@ -257,10 +279,39 @@ const styles = StyleSheet.create({
     marginHorizontal: -2,
   },
 
-  foodGrid: {
+  productGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+  },
+
+  emptyState: {
+    backgroundColor: colors.white,
+    borderRadius: colors.radius.md,
+    padding: 28,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  emptyIcon: {
+    color: colors.primary,
+    fontSize: 34,
+    fontWeight: "800",
+  },
+
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 8,
+  },
+
+  emptyText: {
+    color: colors.gray,
+    fontSize: 12,
+    marginTop: 6,
+    textAlign: "center",
   },
 
   bottomNav: {

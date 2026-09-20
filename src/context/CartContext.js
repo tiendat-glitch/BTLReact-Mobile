@@ -9,17 +9,17 @@ const CartContext = createContext(null);
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
 
-  // Thêm món vào giỏ
-  const addToCart = (food, quantity = 1) => {
+  // Product shape is intentionally kept flat for a simple API adapter boundary.
+  const addToCart = (product, quantity = 1) => {
     setCart((currentCart) => {
       const existingItem = currentCart.find(
-        (item) => item.id === food.id
+        (item) => item.id === product.id
       );
 
-      // Nếu món đã có trong giỏ
+      // Nếu sản phẩm đã có trong giỏ
       if (existingItem) {
         return currentCart.map((item) =>
-          item.id === food.id
+          item.id === product.id
             ? {
                 ...item,
                 quantity:
@@ -29,11 +29,11 @@ export function CartProvider({ children }) {
         );
       }
 
-      // Nếu món chưa có
+      // Nếu sản phẩm chưa có
       return [
         ...currentCart,
         {
-          ...food,
+          ...product,
           quantity,
         },
       ];
@@ -41,10 +41,10 @@ export function CartProvider({ children }) {
   };
 
   // Tăng số lượng
-  const increaseQuantity = (foodId) => {
+  const increaseQuantity = (productId) => {
     setCart((currentCart) =>
       currentCart.map((item) =>
-        item.id === foodId
+        item.id === productId
           ? {
               ...item,
               quantity: item.quantity + 1,
@@ -55,11 +55,11 @@ export function CartProvider({ children }) {
   };
 
   // Giảm số lượng
-  const decreaseQuantity = (foodId) => {
+  const decreaseQuantity = (productId) => {
     setCart((currentCart) =>
       currentCart
         .map((item) =>
-          item.id === foodId
+          item.id === productId
             ? {
                 ...item,
                 quantity: item.quantity - 1,
@@ -70,11 +70,11 @@ export function CartProvider({ children }) {
     );
   };
 
-  // Xóa món
-  const removeFromCart = (foodId) => {
+  // Xóa sản phẩm
+  const removeFromCart = (productId) => {
     setCart((currentCart) =>
       currentCart.filter(
-        (item) => item.id !== foodId
+        (item) => item.id !== productId
       )
     );
   };

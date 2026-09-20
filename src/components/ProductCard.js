@@ -9,13 +9,13 @@ import {
 
 import colors from "../constants/colors";
 
-export default function FoodCard({
-  food,
+export default function ProductCard({
+  product,
   onPress,
 }) {
   const discount = Math.round(
-    ((food.oldPrice - food.price) /
-      food.oldPrice) *
+    ((product.oldPrice - product.price) /
+      product.oldPrice) *
       100
   );
 
@@ -24,6 +24,8 @@ export default function FoodCard({
       style={styles.card}
       onPress={onPress}
       activeOpacity={0.88}
+      accessibilityRole="button"
+      accessibilityLabel={`${product.name}, ${product.price.toLocaleString("vi-VN")} đồng`}
     >
 
       {/* IMAGE */}
@@ -31,7 +33,7 @@ export default function FoodCard({
       <View style={styles.imageContainer}>
 
         <Text style={styles.emoji}>
-          {food.emoji}
+          {product.emoji}
         </Text>
 
         {/* Discount */}
@@ -49,6 +51,8 @@ export default function FoodCard({
           onPress={(event) => {
             event.stopPropagation();
           }}
+          accessibilityRole="button"
+          accessibilityLabel={`Thêm ${product.name} vào yêu thích`}
         >
           <Text style={styles.favoriteIcon}>
             ♡
@@ -65,7 +69,7 @@ export default function FoodCard({
           style={styles.name}
           numberOfLines={2}
         >
-          {food.name}
+          {product.name}
         </Text>
 
         {/* Rating */}
@@ -73,13 +77,13 @@ export default function FoodCard({
         <View style={styles.ratingRow}>
 
           <Text style={styles.rating}>
-            ★ {food.rating}
+            ★ {product.rating}
           </Text>
 
           <View style={styles.separator} />
 
           <Text style={styles.sold}>
-            Đã bán {formatSold(food.sold)}
+            Đã bán {formatSold(product.sold)}
           </Text>
 
         </View>
@@ -89,11 +93,11 @@ export default function FoodCard({
         <View style={styles.priceRow}>
 
           <Text style={styles.price}>
-            {food.price.toLocaleString("vi-VN")}đ
+            {product.price.toLocaleString("vi-VN")}đ
           </Text>
 
           <Text style={styles.oldPrice}>
-            {food.oldPrice.toLocaleString(
+            {product.oldPrice.toLocaleString(
               "vi-VN"
             )}đ
           </Text>
@@ -106,7 +110,7 @@ export default function FoodCard({
 
           <View style={styles.deliveryTag}>
             <Text style={styles.deliveryText}>
-              🚴 {food.deliveryTime}
+              ✓ {product.deliveryTime}
             </Text>
           </View>
 

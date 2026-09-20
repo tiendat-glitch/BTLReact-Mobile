@@ -9,7 +9,7 @@ import {
 
 import colors from "../constants/colors";
 
-export default function SearchBar() {
+export default function SearchBar({ value, onChangeText, onSubmitEditing }) {
   return (
     <View style={styles.wrapper}>
       <View style={styles.searchBox}>
@@ -17,11 +17,20 @@ export default function SearchBar() {
 
         <TextInput
           style={styles.input}
-          placeholder="Tìm món ăn, nhà hàng..."
+          placeholder="Tìm laptop, linh kiện, phụ kiện..."
           placeholderTextColor="#999"
+          value={value}
+          onChangeText={onChangeText}
+          onSubmitEditing={onSubmitEditing}
+          returnKeyType="search"
+          accessibilityLabel="Tìm kiếm sản phẩm"
         />
 
-        <TouchableOpacity style={styles.filterButton}>
+        <TouchableOpacity
+          style={styles.filterButton}
+          accessibilityRole="button"
+          accessibilityLabel="Mở bộ lọc sản phẩm"
+        >
           <Text style={styles.filterIcon}>☷</Text>
         </TouchableOpacity>
       </View>
