@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  ActivityIndicator,
   View,
   Text,
   ScrollView,
@@ -16,6 +17,8 @@ export default function CartScreen({ navigation }) {
     increaseQuantity,
     decreaseQuantity,
     removeFromCart,
+    isCartLoading,
+    cartError,
   } = useCart();
 
   const subtotal = cart.reduce(
@@ -24,9 +27,7 @@ export default function CartScreen({ navigation }) {
     0
   );
 
-  const deliveryFee = subtotal > 0 ? 15000 : 0;
-
-  const total = subtotal + deliveryFee;
+  const total = subtotal;
 
   return (
     <View style={styles.container}>
@@ -35,20 +36,19 @@ export default function CartScreen({ navigation }) {
         contentContainerStyle={styles.scroll}
       >
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-
+          <Text style={styles.eyebrow}>GIỎ HÀNG</Text>
           <Text style={styles.title}>
-            Giỏ hàng
+            {cart.length ? `${cart.length} sản phẩm đã chọn` : "Sẵn sàng để mua sắm"}
           </Text>
-
-          <View style={{ width: 35 }} />
         </View>
 
-        {cart.length === 0 ? (
+        {cartError ? <Text style={styles.error}>{cartError.message}</Text> : null}
+
+        {isCartLoading && cart.length === 0 ? (
+          <View style={styles.loading}><ActivityIndicator color={colors.primary} /></View>
+        ) : null}
+
+        {!isCartLoading && cart.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyEmoji}>
               🛒
@@ -93,7 +93,7 @@ export default function CartScreen({ navigation }) {
 
             {cart.map((item) => (
               <View
-                key={item.id}
+                key={item.cartKey}
                 style={styles.item}
               >
                 <View style={styles.itemImage}>
@@ -119,7 +119,7 @@ export default function CartScreen({ navigation }) {
                   <View style={styles.quantityBox}>
                     <TouchableOpacity
                       onPress={() =>
-                        decreaseQuantity(item.id)
+                        decreaseQuantity(item.cartKey)
                       }
                     >
                       <Text style={styles.minus}>
@@ -133,7 +133,7 @@ export default function CartScreen({ navigation }) {
 
                     <TouchableOpacity
                       onPress={() =>
-                        increaseQuantity(item.id)
+                        increaseQuantity(item.cartKey)
                       }
                     >
                       <Text style={styles.plus}>
@@ -145,7 +145,7 @@ export default function CartScreen({ navigation }) {
 
                 <TouchableOpacity
                   onPress={() =>
-                    removeFromCart(item.id)
+                    removeFromCart(item.cartKey)
                   }
                 >
                   <Text style={styles.delete}>
@@ -161,7 +161,7 @@ export default function CartScreen({ navigation }) {
               </Text>
 
               <Text style={styles.voucherText}>
-                Chọn mã giảm giá
+                Voucher được nhập ở bước checkout
               </Text>
 
               <Text style={styles.arrow}>
@@ -183,9 +183,7 @@ export default function CartScreen({ navigation }) {
 
               <Row
                 title="Phí giao hàng"
-                value={`${deliveryFee.toLocaleString(
-                  "vi-VN"
-                )}đ`}
+                value="Tính khi checkout"
               />
 
               <View style={styles.line} />
@@ -206,7 +204,7 @@ export default function CartScreen({ navigation }) {
         <View style={styles.bottom}>
           <View>
             <Text style={styles.totalLabel}>
-              Tổng thanh toán
+              Tạm tính
             </Text>
 
             <Text style={styles.total}>
@@ -216,11 +214,8 @@ export default function CartScreen({ navigation }) {
 
           <TouchableOpacity
             style={styles.checkoutButton}
-            onPress={() =>
-              navigation.navigate("Checkout", {
-                total,
-              })
-            }
+            onPress={() => navigation.navigate("Checkout")}
+            disabled={isCartLoading}
           >
             <Text style={styles.checkoutText}>
               Đặt hàng →
@@ -268,27 +263,41 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    height: 50,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    minHeight: 68,
+    justifyContent: "center",
   },
 
-  back: {
-    fontSize: 36,
-    color: colors.text,
+  eyebrow: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
   },
 
   title: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "900",
     color: colors.text,
+    marginTop: 3,
   },
 
   empty: {
     alignItems: "center",
     justifyContent: "center",
     marginTop: 120,
+  },
+
+  loading: {
+    minHeight: 180,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  error: {
+    color: colors.red,
+    backgroundColor: "#FEF2F2",
+    borderRadius: 8,
+    padding: 11,
+    marginTop: 10,
   },
 
   emptyEmoji: {

@@ -1,21 +1,59 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  Alert,
+  Image,
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
+import Heart from "lucide-react-native/icons/heart";
+import GitCompareArrows from "lucide-react-native/icons/git-compare-arrows";
 
 import colors from "../constants/colors";
 import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
+import { useCompare } from "../context/CompareContext";
+import {
+  addFavorite,
+  getFavoriteStatus,
+  removeFavorite,
+} from "../services/favoriteService";
 
 export default function ProductDetailScreen({ route, navigation }) {
   const { product } = route.params;
   const item = product;
   const { addToCart } = useCart();
+  const { isAuthenticated } = useAuth();
+  const {
+    hasProduct: isCompared,
+    addProduct: addToCompare,
+    removeProduct: removeFromCompare,
+  } = useCompare();
 
   const [quantity, setQuantity] = useState(1);
+  const [imageFailed, setImageFailed] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!isAuthenticated || !item?.id) {
+      setIsFavorite(false);
+      return undefined;
+    }
+    getFavoriteStatus(item.id)
+      .then((favorited) => {
+        if (active) setIsFavorite(favorited);
+      })
+      .catch(() => {
+        if (active) setIsFavorite(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, item?.id]);
 
   if (!item) {
     return (
@@ -32,10 +70,51 @@ export default function ProductDetailScreen({ route, navigation }) {
   }
 
   const total = item.price * quantity;
+  const hasDiscount = item.oldPrice > item.price && item.oldPrice > 0;
+  const isOutOfStock = item.stockQuantity <= 0;
 
-  const handleAddToCart = () => {
-    addToCart(item, quantity);
-    navigation.navigate("Cart");
+  const handleAddToCart = async () => {
+    if (isOutOfStock) {
+      return;
+    }
+    const added = await addToCart(item, quantity);
+    if (added) navigation.navigate("Main", { screen: "Cart" });
+    else Alert.alert("Không thể thêm vào giỏ", "Vui lòng kiểm tra tồn kho và thử lại.");
+  };
+
+  const toggleFavorite = async () => {
+    if (!isAuthenticated) {
+      Alert.alert("Cần đăng nhập", "Đăng nhập để lưu sản phẩm yêu thích.", [
+        { text: "Để sau", style: "cancel" },
+        {
+          text: "Đăng nhập",
+          onPress: () => navigation.navigate("Login", { redirectTo: "Main" }),
+        },
+      ]);
+      return;
+    }
+    setIsFavoriteLoading(true);
+    try {
+      if (isFavorite) await removeFavorite(item.id);
+      else await addFavorite(item.id);
+      setIsFavorite((current) => !current);
+    } catch (nextError) {
+      Alert.alert(
+        "Không thể cập nhật",
+        nextError instanceof Error ? nextError.message : "Vui lòng thử lại."
+      );
+    } finally {
+      setIsFavoriteLoading(false);
+    }
+  };
+
+  const toggleComparison = () => {
+    if (isCompared(item.id)) {
+      removeFromCompare(item.id);
+      return;
+    }
+    const result = addToCompare(item);
+    if (!result.ok) Alert.alert("Không thể so sánh", result.message);
   };
 
   return (
@@ -50,27 +129,47 @@ export default function ProductDetailScreen({ route, navigation }) {
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Quay lại"
           >
             <Text style={styles.backText}>‹</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.favoriteButton}>
-            <Text style={styles.favoriteText}>♡</Text>
+          <TouchableOpacity
+            style={styles.favoriteButton}
+            onPress={toggleFavorite}
+            disabled={isFavoriteLoading}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isFavorite, busy: isFavoriteLoading }}
+            accessibilityLabel={isFavorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
+          >
+            <Heart
+              color={isFavorite ? colors.red : colors.text}
+              fill={isFavorite ? colors.red : "transparent"}
+              size={21}
+              strokeWidth={2.2}
+            />
           </TouchableOpacity>
 
-          <Text style={styles.productEmoji}>
-            {item.emoji}
-          </Text>
+          {item.imageUrl && !imageFailed ? (
+            <Image
+              source={{ uri: item.imageUrl }}
+              style={styles.productImage}
+              resizeMode="contain"
+              onError={() => setImageFailed(true)}
+              accessibilityLabel={`Ảnh ${item.name}`}
+            />
+          ) : (
+            <Text style={styles.productEmoji}>{item.emoji}</Text>
+          )}
 
-          <View style={styles.discount}>
-            <Text style={styles.discountText}>
-              -{Math.round(
-                ((item.oldPrice - item.price) /
-                  item.oldPrice) *
-                  100
-              )}%
-            </Text>
-          </View>
+          {hasDiscount && (
+            <View style={styles.discount}>
+              <Text style={styles.discountText}>
+                -{Math.round(((item.oldPrice - item.price) / item.oldPrice) * 100)}%
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* CONTENT */}
@@ -88,7 +187,7 @@ export default function ProductDetailScreen({ route, navigation }) {
 
           <View style={styles.ratingRow}>
             <Text style={styles.rating}>
-              ★ {item.rating}
+              {item.rating ? `★ ${item.rating}` : "Chưa có đánh giá"}
             </Text>
 
             <Text style={styles.separator}>
@@ -96,7 +195,7 @@ export default function ProductDetailScreen({ route, navigation }) {
             </Text>
 
             <Text style={styles.sold}>
-              Đã bán {item.sold}
+              {item.sold ? `Đã bán ${item.sold}` : "Sản phẩm mới"}
             </Text>
 
             <Text style={styles.separator}>
@@ -115,9 +214,11 @@ export default function ProductDetailScreen({ route, navigation }) {
               {item.price.toLocaleString("vi-VN")}đ
             </Text>
 
-            <Text style={styles.oldPrice}>
-              {item.oldPrice.toLocaleString("vi-VN")}đ
-            </Text>
+            {hasDiscount && (
+              <Text style={styles.oldPrice}>
+                {item.oldPrice.toLocaleString("vi-VN")}đ
+              </Text>
+            )}
           </View>
 
           <View style={styles.divider} />
@@ -139,20 +240,62 @@ export default function ProductDetailScreen({ route, navigation }) {
           </Text>
 
           <View style={styles.option}>
-            <View>
+            <View style={styles.optionContent}>
               <Text style={styles.optionTitle}>
-                Cấu hình sản phẩm
+                {item.variantName || "Cấu hình sản phẩm"}
               </Text>
-
               <Text style={styles.optionSub}>
-                Thông tin được xác nhận bởi nhà sản xuất
+                {item.specs?.length
+                  ? item.specs.join(" • ")
+                  : "Chưa có thông số chi tiết"}
               </Text>
             </View>
-
-            <Text style={styles.check}>
-              ✓
-            </Text>
+            <Text style={styles.check}>✓</Text>
           </View>
+
+          <TouchableOpacity
+            style={styles.reviewLink}
+            onPress={() => navigation.navigate("Reviews", { product: item })}
+            accessibilityRole="button"
+          >
+            <View>
+              <Text style={styles.optionTitle}>Đánh giá sản phẩm</Text>
+              <Text style={styles.optionSub}>Xem nhận xét hoặc đánh giá đơn đã mua</Text>
+            </View>
+            <Text style={styles.reviewArrow}>›</Text>
+          </TouchableOpacity>
+
+          {item.category === "Laptop" ? (
+            <TouchableOpacity
+              style={styles.reviewLink}
+              onPress={() => navigation.navigate("LaptopUpgrade", { product: item })}
+              accessibilityRole="button"
+            >
+              <View>
+                <Text style={styles.optionTitle}>Nâng cấp Laptop</Text>
+                <Text style={styles.optionSub}>Chọn RAM và SSD theo giới hạn phần cứng</Text>
+              </View>
+              <Text style={styles.reviewArrow}>›</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          <TouchableOpacity
+            style={styles.reviewLink}
+            onPress={toggleComparison}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isCompared(item.id) }}
+          >
+            <View style={styles.compareLabel}>
+              <GitCompareArrows color={colors.primary} size={19} />
+              <View style={styles.compareText}>
+                <Text style={styles.optionTitle}>
+                  {isCompared(item.id) ? "Đã thêm vào so sánh" : "Thêm vào so sánh"}
+                </Text>
+                <Text style={styles.optionSub}>So sánh tối đa 4 sản phẩm cùng danh mục</Text>
+              </View>
+            </View>
+            <Text style={styles.reviewArrow}>›</Text>
+          </TouchableOpacity>
 
           <View style={styles.option}>
             <View>
@@ -161,13 +304,11 @@ export default function ProductDetailScreen({ route, navigation }) {
               </Text>
 
               <Text style={styles.optionSub}>
-                Bảo hành chính hãng 24 tháng
+                Bảo hành {item.warrantyMonths || 12} tháng
               </Text>
             </View>
 
-            <Text style={styles.plus}>
-              +
-            </Text>
+            <Text style={styles.plus}>✓</Text>
           </View>
 
           {/* QUANTITY */}
@@ -201,8 +342,9 @@ export default function ProductDetailScreen({ route, navigation }) {
                   styles.plusButton,
                 ]}
                 onPress={() =>
-                  setQuantity(quantity + 1)
+                  setQuantity(Math.min(item.stockQuantity, quantity + 1))
                 }
+                disabled={isOutOfStock || quantity >= item.stockQuantity}
               >
                 <Text style={styles.plusText}>
                   +
@@ -227,11 +369,17 @@ export default function ProductDetailScreen({ route, navigation }) {
         </View>
 
         <TouchableOpacity
-          style={styles.addButton}
+          style={[
+            styles.addButton,
+            isOutOfStock && styles.disabledAddButton,
+          ]}
           onPress={handleAddToCart}
+          disabled={isOutOfStock}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isOutOfStock }}
         >
           <Text style={styles.addButtonText}>
-            🛒 Thêm vào giỏ
+            {isOutOfStock ? "Tạm hết hàng" : "🛒 Thêm vào giỏ"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -294,6 +442,11 @@ const styles = StyleSheet.create({
     fontSize: 145,
   },
 
+  productImage: {
+    width: "90%",
+    height: "90%",
+  },
+
   backButton: {
     position: "absolute",
     top: 18,
@@ -319,16 +472,13 @@ const styles = StyleSheet.create({
     right: 16,
     width: 44,
     height: 44,
-    borderRadius: 15,
+    borderRadius: 8,
     backgroundColor: colors.white,
+    borderColor: colors.border,
+    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 2,
-  },
-
-  favoriteText: {
-    fontSize: 27,
-    color: colors.primary,
   },
 
   discount: {
@@ -452,6 +602,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
+  optionContent: {
+    flex: 1,
+    paddingRight: 12,
+  },
+
+  reviewLink: {
+    minHeight: 58,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 13,
+    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  reviewArrow: { color: colors.primary, fontSize: 24, fontWeight: "700" },
+
+  compareLabel: { flex: 1, flexDirection: "row", alignItems: "center" },
+  compareText: { flex: 1, marginLeft: 9 },
+
   optionTitle: {
     fontSize: 13,
     fontWeight: "800",
@@ -567,6 +739,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  disabledAddButton: {
+    backgroundColor: colors.muted,
   },
 
   addButtonText: {

@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
   View,
   Text,
   ScrollView,
@@ -9,41 +12,57 @@ import {
 } from "react-native";
 
 import SearchBar from "../components/SearchBar";
-import PromoBanner from "../components/PromoBanner";
 import CategoryItem from "../components/CategoryItem";
 import ProductCard from "../components/ProductCard";
+import PromotionCarousel from "../components/PromotionCarousel";
 
-import { getCatalogSnapshot } from "../data/catalogAdapter";
+import useCatalog from "../hooks/useCatalog";
 
 import colors from "../constants/colors";
 import { useCart } from "../context/CartContext";
+import { getPromotions } from "../services/promotionService";
 
 export default function HomeScreen({ navigation }) {
-  const [selectedCategory, setSelectedCategory] = useState("Tất cả");
   const [query, setQuery] = useState("");
+  const [promotions, setPromotions] = useState([]);
 
-  const { products, categories } = getCatalogSnapshot();
-  const { cart, cartCount } = useCart();
+  const {
+    products,
+    categories,
+    isLoading,
+    isRefreshing,
+    error,
+    retry,
+    refresh,
+  } = useCatalog();
+  const { cartCount, addToCart } = useCart();
+  const featuredProducts = products.slice(0, 8);
 
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredProducts = products.filter((product) => {
-    const matchesCategory =
-      selectedCategory === "Tất cả" ||
-      product.category === selectedCategory;
-    const matchesQuery =
-      !normalizedQuery ||
-      `${product.name} ${product.brand} ${product.category}`
-        .toLowerCase()
-        .includes(normalizedQuery);
-
-    return matchesCategory && matchesQuery;
-  });
+  useEffect(() => {
+    let active = true;
+    getPromotions()
+      .then((items) => {
+        if (active) setPromotions(items);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={refresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* HEADER */}
 
@@ -51,9 +70,9 @@ export default function HomeScreen({ navigation }) {
           <View>
             <Text style={styles.locationLabel}>CỬA HÀNG TRỰC TUYẾN</Text>
 
-            <TouchableOpacity>
-              <Text style={styles.location}>BTL Computer Store ▾</Text>
-            </TouchableOpacity>
+            <View>
+              <Text style={styles.location}>BTL Computer Store</Text>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -75,109 +94,135 @@ export default function HomeScreen({ navigation }) {
         {/* SEARCH */}
 
         <View style={styles.searchWrapper}>
-          <SearchBar value={query} onChangeText={setQuery} />
+          <SearchBar
+            value={query}
+            onChangeText={setQuery}
+            onSubmitEditing={() =>
+              navigation.navigate("Catalog", { initialQuery: query })
+            }
+          />
         </View>
 
-        {/* BANNER */}
-
-        <PromoBanner />
-
-        {/* CATEGORY */}
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Khám phá danh mục</Text>
-
-          <Text style={styles.seeAll}>Xem tất cả</Text>
+        <View style={styles.promotionWrapper}>
+          <PromotionCarousel
+            promotions={promotions}
+            onPress={(promotion) => {
+              if (promotion.target_type === "CATEGORY") {
+                navigation.navigate("Catalog", {
+                  category: promotion.target_value,
+                });
+              }
+            }}
+          />
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryList}
-        >
-          {categories.map((category) => (
-            <CategoryItem
-              key={category.id}
-              category={category}
-              selected={selectedCategory === category.name}
-              onPress={() => setSelectedCategory(category.name)}
-            />
-          ))}
-        </ScrollView>
-
-        {/* FOOD */}
-
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>Sản phẩm nổi bật</Text>
-
-            <Text style={styles.sectionSubTitle}>
-              Lựa chọn tốt cho bạn hôm nay
-            </Text>
+        {isLoading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Đang tải danh mục sản phẩm...</Text>
           </View>
-
-          <Text style={styles.seeAll}>Xem thêm</Text>
-        </View>
-
-        {filteredProducts.length > 0 ? (
-          <View style={styles.productGrid}>
-            {filteredProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onPress={() =>
-                  navigation.navigate("ProductDetail", {
-                    product,
-                  })
-                }
-              />
-            ))}
+        ) : error && products.length === 0 ? (
+          <View style={styles.errorState}>
+            <Text style={styles.errorTitle}>Chưa kết nối được cửa hàng</Text>
+            <Text style={styles.errorText}>{error.message}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => retry()}
+              accessibilityRole="button"
+              accessibilityLabel="Thử tải lại danh mục"
+            >
+              <Text style={styles.retryText}>Thử lại</Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>⌕</Text>
-            <Text style={styles.emptyTitle}>Không tìm thấy sản phẩm</Text>
-            <Text style={styles.emptyText}>
-              Thử từ khóa khác hoặc chọn một danh mục khác.
-            </Text>
-          </View>
+          <>
+            {error && (
+              <View style={styles.refreshError}>
+                <Text style={styles.refreshErrorText}>{error.message}</Text>
+              </View>
+            )}
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Khám phá danh mục</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate("Catalog")}
+                accessibilityRole="button"
+              >
+                <Text style={styles.seeAll}>Xem tất cả</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.categoryList}
+            >
+              {categories.map((category) => (
+                <CategoryItem
+                  key={category.id}
+                  category={category}
+                  selected={category.name === "Tất cả"}
+                  onPress={() =>
+                    navigation.navigate("Catalog", {
+                      category:
+                        category.id === "all" ? undefined : category.id,
+                    })
+                  }
+                />
+              ))}
+            </ScrollView>
+
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Sản phẩm nổi bật</Text>
+                <Text style={styles.sectionSubTitle}>
+                  Dữ liệu sản phẩm đang hoạt động từ cửa hàng
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate("Catalog")}
+                accessibilityRole="button"
+              >
+                <Text style={styles.seeAll}>Xem thêm</Text>
+              </TouchableOpacity>
+            </View>
+
+            {featuredProducts.length > 0 ? (
+              <View style={styles.productGrid}>
+                {featuredProducts.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onAdd={async () => {
+                      const added = await addToCart(product);
+                      if (!added) {
+                        Alert.alert(
+                          "Không thể thêm vào giỏ",
+                          "Vui lòng kiểm tra tồn kho và thử lại."
+                        );
+                      }
+                    }}
+                    onPress={() =>
+                      navigation.navigate("ProductDetail", {
+                        product,
+                      })
+                    }
+                  />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyIcon}>⌕</Text>
+                <Text style={styles.emptyTitle}>Không tìm thấy sản phẩm</Text>
+                <Text style={styles.emptyText}>
+                  Thử từ khóa khác hoặc chọn một danh mục khác.
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 
-      {/* BOTTOM NAVIGATION */}
-
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.activeIcon}>🏠</Text>
-
-          <Text style={styles.activeText}>Khám phá</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>🏷️</Text>
-
-          <Text style={styles.navText}>Đơn hàng</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate("Cart")}
-        >
-          <View>
-            <Text style={styles.navIcon}>🛒</Text>
-
-            {cartCount > 0 && <View style={styles.navBadge} />}
-          </View>
-
-          <Text style={styles.navText}>Giỏ hàng</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>👤</Text>
-
-          <Text style={styles.navText}>Tài khoản</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -191,7 +236,7 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 100,
+    paddingBottom: 32,
   },
 
   header: {
@@ -249,6 +294,10 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
 
+  promotionWrapper: {
+    marginTop: 16,
+  },
+
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -285,6 +334,72 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
 
+  loadingState: {
+    minHeight: 220,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingText: {
+    color: colors.gray,
+    fontSize: 13,
+    marginTop: 12,
+  },
+
+  errorState: {
+    backgroundColor: colors.white,
+    borderRadius: colors.radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: 24,
+    padding: 24,
+    alignItems: "center",
+  },
+
+  errorTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  errorText: {
+    color: colors.gray,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 8,
+    textAlign: "center",
+  },
+
+  retryButton: {
+    minHeight: 44,
+    backgroundColor: colors.primary,
+    borderRadius: colors.radius.sm,
+    justifyContent: "center",
+    marginTop: 16,
+    paddingHorizontal: 20,
+  },
+
+  retryText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  refreshError: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+    borderRadius: colors.radius.sm,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 12,
+  },
+
+  refreshErrorText: {
+    color: colors.red,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+
   emptyState: {
     backgroundColor: colors.white,
     borderRadius: colors.radius.md,
@@ -314,55 +429,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  bottomNav: {
-    position: "absolute",
-    left: 12,
-    right: 12,
-    bottom: 12,
-    height: 68,
-    borderRadius: 20,
-    backgroundColor: colors.white,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-
-  navItem: {
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 65,
-  },
-
-  activeIcon: {
-    fontSize: 21,
-  },
-
-  navIcon: {
-    fontSize: 20,
-  },
-
-  activeText: {
-    fontSize: 10,
-    color: colors.primary,
-    fontWeight: "800",
-    marginTop: 3,
-  },
-
-  navText: {
-    fontSize: 10,
-    color: colors.gray,
-    marginTop: 3,
-  },
-
-  navBadge: {
-    position: "absolute",
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-    right: -2,
-    top: -1,
-  },
 });

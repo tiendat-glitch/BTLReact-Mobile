@@ -2,7 +2,6 @@ import React from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
 } from "react-native";
 
@@ -31,12 +30,6 @@ export default function PromoBanner() {
         <Text style={styles.description}>
           Ưu đãi laptop & phụ kiện
         </Text>
-
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>
-            Xem ưu đãi →
-          </Text>
-        </TouchableOpacity>
 
       </View>
 
@@ -114,25 +107,6 @@ const styles = StyleSheet.create({
   description: {
     color: "#FFE8DD",
     fontSize: 11,
-  },
-
-  button: {
-    backgroundColor: colors.white,
-
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-
-    borderRadius: 9,
-
-    alignSelf: "flex-start",
-
-    marginTop: 9,
-  },
-
-  buttonText: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "900",
   },
 
   right: {

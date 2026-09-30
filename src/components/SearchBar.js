@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
 } from "react-native";
 
@@ -26,13 +25,6 @@ export default function SearchBar({ value, onChangeText, onSubmitEditing }) {
           accessibilityLabel="Tìm kiếm sản phẩm"
         />
 
-        <TouchableOpacity
-          style={styles.filterButton}
-          accessibilityRole="button"
-          accessibilityLabel="Mở bộ lọc sản phẩm"
-        >
-          <Text style={styles.filterIcon}>☷</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -83,20 +75,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
 
-  filterButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-
-    backgroundColor: colors.primary,
-
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  filterIcon: {
-    color: colors.white,
-    fontSize: 22,
-    fontWeight: "700",
-  },
 });

@@ -6,10 +6,9 @@
 Expo SDK 54 và React Native. Mục tiêu là hoàn thiện sản phẩm có thể chạy được
 end-to-end, không chỉ là tập hợp màn hình mẫu.
 
-Nguồn sự thật của dữ liệu và nghiệp vụ là file `schema.sql` được người dùng cung
-cấp tại `D:\react-mobile\schema.sql`. Khi làm việc trên máy khác, phải cấu hình
-đường dẫn schema tương đương trong tài liệu dự án hoặc đặt bản sao có kiểm soát
-trong thư mục backend/database.
+Nguồn sự thật của dữ liệu và nghiệp vụ là file
+`BE_Mobile_DaNenTang/schema.sql`. Không tạo thêm bản sao schema ở thư mục gốc;
+mọi migration về sau phải được đối chiếu với file schema này.
 
 Mọi thay đổi phải tuân theo các nguyên tắc sau:
 
