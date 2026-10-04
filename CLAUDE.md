@@ -375,3 +375,130 @@ Nếu lựa chọn không ảnh hưởng contract, chọn phương án đơn gi�
 pattern hiện tại và ghi lại quyết định trong PR. Không tự mở rộng scope chỉ vì
 schema có bảng tương ứng; triển khai theo milestone và ưu tiên luồng mua hàng
 hoàn chỉnh trước.
+
+## 12. Quy chuẩn UI/UX (bắt buộc khi thay đổi giao diện)
+
+Mọi thay đổi UI/UX PHẢI tuân thủ các nguyên tắc dưới đây. Mục này là nguồn
+sự thật cho cả tác giả hiện tại và các lần chỉnh sửa tiếp theo; agent chỉ
+được phá vỡ rule nếu được phê duyệt rõ trong PR và ghi lại lý do.
+
+### 12.1 Design token — không hard-code
+
+- Mọi giá trị màu, khoảng cách, radius, font-size, font-weight, line-height
+  và shadow PHẢI lấy từ `src/constants/colors.ts`, `src/constants/spacing.ts`,
+  `src/constants/typography.ts`, `src/constants/shadows.ts`. Không hard-code
+  trong component. Khi cần giá trị mới, thêm vào token trước rồi mới dùng.
+- Bảng màu chính thức (xem `colors.ts`):
+  - Brand: `primary` `#1B5BFF` (CTA), `accent` `#F97316` (ưu đãi/hot).
+  - Status: `success` `#0F8A5F`, `warning` `#B45309`, `danger` `#D7263D`,
+    `info` `#0E7490` (mỗi status có cặp `*Light`/`*Soft` tương ứng).
+  - Text: `text` `#0F1A2E`, `textSubtle` `#3A4A66`, `gray` `#5B6A85`,
+    `muted` `#8593AC`, `lightGray` `#C4CCDB`.
+  - Background: `background` `#F4F6FB`, `surface` `#FFFFFF`,
+    `surfaceMuted` `#EEF1F7`.
+- Spacing scale 4pt grid (xem `spacing.ts`): `px4 / px8 / px12 / px16 / px20 /
+  px24 / px32 / px40 / px48 / px56 / px64 / px80`. Không thêm giá trị lẻ.
+- Radius scale (xem `colors.radius`): `xs 4, sm 8, md 12, lg 16, xl 20,
+  xxl 28, pill 999`. Mặc định card `lg`, button `md`, chip/pill `pill`.
+- Elevation 3 cấp: `card` (elevation 2), `floating` (4–6), `modal` (12).
+  Không dùng shadow nặng cho list item.
+
+### 12.2 Typography
+
+- 5 cấp hierarchy: `display` (hero) → `h1` (page title) → `h2` (section) →
+  `h3` (card title) → `h4` (small heading). Body: `body`, `bodyStrong`,
+  `bodyLead`. Caption: `caption`, `captionStrong`, `micro`, `eyebrow`.
+- `eyebrow` dùng cho label phân loại phía trên tiêu đề (uppercase, letter
+  spacing 0.8). Luôn đặt trên `h2`/`h1` của section.
+- Không trộn font weight ngoài token (đã chốt 400/500/600/700/800/900).
+- Tiền: dùng `priceMd` cho card, `priceLg` cho cart total, `priceXl` cho
+  hero. Đơn vị "đ" đứng sát số (không có space), ví dụ `1.290.000đ`.
+
+### 12.3 Màu & độ tương phản
+
+- Cặp text/background PHẢI đạt WCAG AA (≥ 4.5:1 cho body, ≥ 3:1 cho
+  heading/icon lớn). Cấm `text` trên `background` mờ hoặc `muted` cho body.
+- Icon trên nền sáng dùng `text` hoặc `textSubtle`; icon nổi bật mới dùng
+  `primary` / `accent`.
+- Không dùng màu status cho action không liên quan (vd đỏ cho CTA thường).
+
+### 12.4 Thành phần & bố cục
+
+- Mọi component tương tác PHẢI có `accessibilityLabel`, focus state, và
+  touch target tối thiểu 44pt (dùng `hitSlop` cho icon-only).
+- Button: dùng component `Button` chuẩn với 6 variant (`primary`,
+  `secondary`, `ghost`, `danger`, `outlineDanger`, `tonal`) × 3 size. Cấm
+  tạo button mới ngoài component. Nút chính: `primary size=lg`. Nút phụ:
+  `secondary` hoặc `ghost`. Nút icon: thêm `accessibilityLabel`.
+- Card: dùng component `Card` với 4 variant (`default outlined`, `flat`,
+  `tonal`, `elevated`) × 4 padding × 4 radius. Không tạo card riêng.
+- List hàng dọc: dùng `ListRow` (icon leading + label + mô tả + chevron).
+- FeedbackState bắt buộc cho 3 trạng thái: loading (spinner), empty (icon
+  trong halo tone-on-tone + retry nếu có), error (icon danger + retry).
+- BottomSheet dùng cho filter, variant picker, quick view. Animation ≥ 250ms.
+- SearchBar variant `floating` mặc định cho Home/Catalog; `inline` cho
+  trong sheet.
+
+### 12.5 Bố cục màn hình
+
+- Mỗi màn hình có cấu trúc:
+  1. Header (SafeArea top, brand/CTA actions).
+  2. Section eyebrow + title + (subtitle) + action nếu có.
+  3. Nội dung dạng card hoặc list.
+  4. Sticky footer (chỉ khi CTA chính quan trọng, vd cart/checkout).
+- Section gap tối thiểu `spacing.px16`. Card gap `spacing.px12`.
+- Tránh padding top/bottom lẻ; luôn theo scale 4pt.
+- Sticky CTA (cart total, checkout) PHẢI dùng `shadows.sticky` và safe
+  area bottom ≥ 12pt.
+
+### 12.6 Trạng thái & dữ liệu
+
+- Mọi màn có đủ: loading, success, empty, error, retry.
+- Không hiển thị alert im lặng cho lỗi quan trọng — dùng inline error box
+  (tone `dangerLight`) hoặc FeedbackState. Retry button phải có.
+- Pull-to-refresh cho danh sách dài (Home, Catalog, Orders, Notifications).
+- Skeleton preferred hơn spinner cho content load > 500ms.
+- Empty state kèm CTA gợi ý (vd cart trống → "Tiếp tục mua sắm").
+
+### 12.7 Hình ảnh & media
+
+- Ảnh sản phẩm dùng `resizeMode="cover"`, có placeholder `surfaceMuted`.
+  Khi load fail, fallback emoji hoặc icon, không để trống.
+- Luôn đặt `accessibilityLabel` cho Image mô tả sản phẩm.
+- Banner khuyến mãi: gradient brand khi không có ảnh, ưu tiên 1 ảnh nổi
+  bật thay vì list nhiều ảnh nhỏ.
+
+### 12.8 Tiền, ngày, số
+
+- Format tiền `vi-VN`, không phần thập phân. Dùng `formatCurrency` từ
+  `utils/formatters.ts` — không tự nối chuỗi.
+- Ngày: `dd/MM/yyyy` cho user-facing; ISO 8601 chỉ trong log/API.
+- Số điện thoại hiển thị theo format quen thuộc Việt Nam.
+
+### 12.9 Hiệu ứng & micro-interaction
+
+- Pressed state: `opacity 0.85 + scale 0.98` (Button/Pressable tương tác).
+  Không animate transform nặng trong list.
+- Loading CTA: spinner thay thế label, giữ nguyên kích thước.
+- Stagger animation cho list: optional, chỉ trên Home/Catalog với list
+  ngắn (< 10 item). Tránh stagger cho list dài (perf).
+
+### 12.10 Tab bar & navigation
+
+- Tab bar tối thiểu 72pt chiều cao, label 11pt bold, icon 22pt.
+- Badge số lượng (cart) dùng `accent` để nổi bật, có border 2pt cùng
+  màu nền tab bar để tách khỏi icon.
+- Stack screen luôn có back button rõ ràng (`ScreenHeader`).
+
+### 12.11 Checklist trước khi merge UI change
+
+- [ ] Mọi giá trị lấy từ `constants/`.
+- [ ] Component Button/Card/ListRow/FeedbackState/BottomSheet/SearchBar dùng
+  từ thư viện chuẩn; không tạo bản sao.
+- [ ] Có loading/empty/error/retry state.
+- [ ] Touch target ≥ 44pt; có `accessibilityLabel`.
+- [ ] Cặp text/background đạt WCAG AA.
+- [ ] Không log secret, không hard-code giá/role.
+- [ ] Chạy `npx tsc --noEmit` pass.
+- [ ] Đã test trên iOS/Android (hoặc web qua `expo start --web`).
+- [ ] Ảnh trước/sau được đính kèm trong PR hoặc lưu vào `docs/`.

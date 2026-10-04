@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import {
   NavigationContainer,
   type NavigatorScreenParams,
@@ -13,6 +13,7 @@ import ShoppingCart from "lucide-react-native/icons/shopping-cart";
 import UserRound from "lucide-react-native/icons/user-round";
 
 import colors from "../constants/colors";
+import spacing from "../constants/spacing";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import AddressFormScreen from "../screens/AddressFormScreen";
@@ -34,6 +35,7 @@ import ReviewsScreen from "../screens/ReviewsScreen";
 import ComparisonScreen from "../screens/ComparisonScreen";
 import PcBuilderScreen from "../screens/PcBuilderScreen";
 import LaptopUpgradeScreen from "../screens/LaptopUpgradeScreen";
+import PriceAlertsScreen from "../screens/PriceAlertsScreen";
 import type { CatalogProduct } from "../types/catalog";
 import type { Address } from "../types/address";
 
@@ -61,6 +63,7 @@ export type RootStackParamList = {
   Comparison: undefined;
   PcBuilder: undefined;
   LaptopUpgrade: { product: CatalogProduct };
+  PriceAlerts: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -108,7 +111,16 @@ function MainTabs() {
           tabBarItemStyle: styles.tabItem,
           tabBarLabelStyle: styles.tabLabel,
           tabBarIcon: ({ color, focused }) => (
-            <Icon color={color} size={22} strokeWidth={focused ? 2.6 : 2} />
+            <View>
+              <Icon color={color} size={22} strokeWidth={focused ? 2.6 : 2} />
+              {route.name === "Cart" && cartCount > 0 ? (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           ),
         };
       }}
@@ -120,8 +132,7 @@ function MainTabs() {
         component={CartScreen}
         options={{
           title: "Giỏ hàng",
-          tabBarBadge: cartCount > 0 ? Math.min(cartCount, 99) : undefined,
-          tabBarBadgeStyle: styles.badge,
+          tabBarBadge: undefined,
         }}
       />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Tài khoản" }} />
@@ -159,6 +170,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Comparison" component={ComparisonScreen} />
         <Stack.Screen name="PcBuilder" component={PcBuilderScreen} />
         <Stack.Screen name="LaptopUpgrade" component={LaptopUpgradeScreen} />
+        <Stack.Screen name="PriceAlerts" component={PriceAlertsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -175,31 +187,53 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   tabBar: {
-    minHeight: 66,
-    backgroundColor: colors.white,
+    minHeight: 64,
+    backgroundColor: colors.surface,
     borderTopColor: colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 7,
-    paddingBottom: 6,
-    elevation: 8,
+    paddingTop: spacing.px6,
+    paddingBottom: spacing.px6,
+    elevation: 12,
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
   },
   tabItem: {
     minHeight: 52,
+    paddingTop: 2,
+    paddingBottom: 2,
   },
   tabLabel: {
-    fontSize: 10,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "800",
     letterSpacing: 0,
+    marginTop: 2,
+  },
+  tabBadge: {
+    position: "absolute",
+    top: -4,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  tabBadgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: "900",
   },
   badge: {
     minWidth: 17,
     height: 17,
     borderRadius: 8,
-    backgroundColor: colors.red,
+    backgroundColor: colors.danger,
     color: colors.white,
     fontSize: 9,
     fontWeight: "800",

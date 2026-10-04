@@ -1,7 +1,7 @@
+// CatalogScreen — Hero với search + filter + category rail, grid 2 cột, FAB filter.
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -12,31 +12,43 @@ import {
 import Search from "lucide-react-native/icons/search";
 import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
 import X from "lucide-react-native/icons/x";
-import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import FeedbackState from "../components/FeedbackState";
 import ProductCard from "../components/ProductCard";
+import SearchBar from "../components/SearchBar";
+import SpecFilterSheet from "../components/SpecFilterSheet";
 import colors from "../constants/colors";
+import spacing from "../constants/spacing";
+import typography from "../constants/typography";
 import { useCart } from "../context/CartContext";
+import useCompareAction from "../hooks/useCompareAction";
 import usePaginatedCatalog from "../hooks/usePaginatedCatalog";
 import { getCatalogCategories } from "../services/catalogApiService";
-import type { CatalogCategory, CatalogProduct } from "../types/catalog";
-import type { MainTabParamList } from "../navigation/AppNavigator";
+import {
+  EMPTY_FILTER,
+  countActiveFilterGroups,
+  isFilterEmpty,
+  type SpecFilter,
+} from "../types/specFilter";
 
-type Props = BottomTabScreenProps<MainTabParamList, "Catalog">;
-
-type CartActions = {
-  addToCart: (product: CatalogProduct, quantity?: number) => Promise<boolean>;
-};
-
-export default function CatalogScreen({ navigation, route }: Props) {
-  const { addToCart } = useCart() as CartActions;
-  const [categories, setCategories] = useState<CatalogCategory[]>([
-    { id: "all", name: "Tất cả", emoji: "✨", slug: "all" },
+export default function CatalogScreen({ navigation, route }: any) {
+  const { addToCart } = useCart();
+  const compare = useCompareAction();
+  const [categories, setCategories] = useState([
+    { id: "all", name: "Tất cả", slug: "all" },
   ]);
   const [query, setQuery] = useState(route.params?.initialQuery || "");
   const [category, setCategory] = useState("all");
-  const catalog = usePaginatedCatalog(query, category);
+  const [filter, setFilter] = useState<SpecFilter>(EMPTY_FILTER);
+  const [filterVisible, setFilterVisible] = useState(false);
+
+  const catalog = usePaginatedCatalog(query, category, filter);
   const filteredProducts = catalog.products;
+  const activeFilterCount = useMemo(
+    () => countActiveFilterGroups(filter),
+    [filter],
+  );
 
   useEffect(() => {
     let active = true;
@@ -57,33 +69,55 @@ export default function CatalogScreen({ navigation, route }: Props) {
     if (route.params?.category) {
       const requested = route.params.category;
       const match = categories.find(
-        (item) =>
+        (item: any) =>
           item.id === requested ||
           item.slug === requested ||
-          item.name === requested
+          item.name === requested,
       );
       if (match) setCategory(match.id);
     }
   }, [route.params?.initialQuery, route.params?.category, categories]);
 
-  const addProduct = async (product: CatalogProduct) => {
-    const added = await addToCart(product);
-    if (!added) {
-      Alert.alert("Không thể thêm vào giỏ", "Vui lòng kiểm tra tồn kho và thử lại.");
-    }
+  const addProduct = async (product: any) => {
+    await addToCart(product as any);
+  };
+
+  const handleApplyFilter = (next: SpecFilter) => {
+    setFilter(next);
+    setFilterVisible(false);
   };
 
   if (catalog.isLoading && filteredProducts.length === 0) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.stateText}>Đang tải catalog...</Text>
-      </View>
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <HeaderHero
+          query={query}
+          setQuery={setQuery}
+          total={catalog.pagination.total}
+          onFilter={() => setFilterVisible(true)}
+          activeFilterCount={activeFilterCount}
+        />
+        <View style={styles.categoryRow}>
+          {categories.map((c: any) => (
+            <CategoryChip
+              key={c.id}
+              label={c.name}
+              selected={category === c.id}
+              onPress={() => setCategory(c.id)}
+            />
+          ))}
+        </View>
+        <FeedbackState
+          variant="loading"
+          title="Đang tải catalog..."
+          fullScreen
+        />
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <FlatList
         data={filteredProducts}
         keyExtractor={(item) => item.variantId}
@@ -96,41 +130,31 @@ export default function CatalogScreen({ navigation, route }: Props) {
         onEndReachedThreshold={0.35}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
-          <>
-            <View style={styles.headingRow}>
-              <View>
-                <Text style={styles.eyebrow}>CATALOG</Text>
-                <Text style={styles.heading}>Tìm đúng thiết bị</Text>
-              </View>
-              <View style={styles.countBadge}>
-                <Text style={styles.countText}>{catalog.pagination.total}</Text>
-              </View>
-            </View>
+          <View style={styles.headerWrap}>
+            <HeaderHero
+              query={query}
+              setQuery={setQuery}
+              total={catalog.pagination.total}
+              onFilter={() => setFilterVisible(true)}
+              activeFilterCount={activeFilterCount}
+            />
 
-            <View style={styles.searchBox}>
-              <Search color={colors.gray} size={20} />
-              <TextInput
-                style={styles.input}
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Tên, thương hiệu hoặc SKU"
-                placeholderTextColor={colors.muted}
-                returnKeyType="search"
-                accessibilityLabel="Tìm kiếm catalog"
-              />
-              {query ? (
+            {activeFilterCount > 0 ? (
+              <View style={styles.activeFilterRow}>
+                <View style={styles.filterPill}>
+                  <Text style={styles.filterPillText} numberOfLines={1}>
+                    {activeFilterCount} bộ lọc đang áp dụng
+                  </Text>
+                </View>
                 <Pressable
-                  style={styles.clearButton}
-                  onPress={() => setQuery("")}
+                  onPress={() => setFilter(EMPTY_FILTER)}
                   accessibilityRole="button"
-                  accessibilityLabel="Xóa từ khóa"
+                  style={styles.clearFilterBtn}
                 >
-                  <X color={colors.gray} size={18} />
+                  <Text style={styles.clearFilterText}>Xoá</Text>
                 </Pressable>
-              ) : (
-                <SlidersHorizontal color={colors.primary} size={19} />
-              )}
-            </View>
+              </View>
+            ) : null}
 
             <FlatList
               horizontal
@@ -138,78 +162,384 @@ export default function CatalogScreen({ navigation, route }: Props) {
               keyExtractor={(item) => item.id}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.categoryList}
-              renderItem={({ item }) => {
+              renderItem={({ item }: any) => {
                 const selected = category === item.id;
                 return (
-                  <Pressable
-                    style={[styles.categoryChip, selected && styles.categoryChipSelected]}
+                  <CategoryChip
+                    label={item.name}
+                    selected={selected}
                     onPress={() => setCategory(item.id)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                  >
-                    <Text style={[styles.categoryLabel, selected && styles.categoryLabelSelected]}>
-                      {item.name}
-                    </Text>
-                  </Pressable>
+                  />
                 );
               }}
             />
 
             {catalog.error ? (
-              <Pressable style={styles.errorBox} onPress={() => catalog.retry()}>
-                <Text style={styles.errorText}>{catalog.error.message}</Text>
+              <Pressable
+                style={styles.errorBox}
+                onPress={() => catalog.retry()}
+              >
+                <Text style={styles.errorText}>
+                  {catalog.error.message}
+                </Text>
                 <Text style={styles.retryText}>Chạm để thử lại</Text>
               </Pressable>
             ) : null}
-          </>
+
+            <View style={styles.resultsHeader}>
+              <Text style={styles.resultsLabel} numberOfLines={1}>
+                {filteredProducts.length} / {catalog.pagination.total} sản
+                phẩm
+              </Text>
+            </View>
+          </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }: any) => (
           <ProductCard
             product={item}
             onAdd={() => addProduct(item)}
-            onPress={() => navigation.getParent()?.navigate("ProductDetail", { product: item })}
+            onCompare={() => compare.toggle(item)}
+            inCompare={compare.hasProduct(item.id)}
+            onPress={() =>
+              navigation
+                .getParent()
+                ?.navigate("ProductDetail", { product: item })
+            }
           />
         )}
         ListFooterComponent={
           catalog.isLoadingMore ? (
-            <ActivityIndicator style={styles.footerLoader} color={colors.primary} />
+            <ActivityIndicator
+              style={styles.footerLoader}
+              color={colors.primary}
+            />
           ) : null
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Search color={colors.muted} size={30} />
-            <Text style={styles.emptyTitle}>Không có sản phẩm phù hợp</Text>
-            <Text style={styles.stateText}>Thử từ khóa ngắn hơn hoặc chọn danh mục khác.</Text>
-          </View>
+          !catalog.isLoading ? (
+            <FeedbackState
+              variant="empty"
+              title="Không có sản phẩm phù hợp"
+              description={
+                isFilterEmpty(filter)
+                  ? "Thử từ khoá ngắn hơn hoặc chọn danh mục khác."
+                  : "Bỏ bớt tiêu chí lọc để thấy thêm sản phẩm."
+              }
+            />
+          ) : null
         }
       />
+
+      <SpecFilterSheet
+        visible={filterVisible}
+        facets={catalog.facets}
+        initial={filter}
+        onClose={() => setFilterVisible(false)}
+        onApply={handleApplyFilter}
+      />
+    </SafeAreaView>
+  );
+}
+
+function HeaderHero({
+  query,
+  setQuery,
+  total,
+  onFilter,
+  activeFilterCount,
+}: {
+  query: string;
+  setQuery: (v: string) => void;
+  total: number;
+  onFilter: () => void;
+  activeFilterCount: number;
+}) {
+  return (
+    <View style={styles.hero}>
+      <View style={styles.heroTop}>
+        <View style={styles.heroHeading}>
+          <Text style={styles.eyebrow}>CATALOG</Text>
+          <Text style={styles.heading}>Tìm đúng thiết bị bạn cần</Text>
+        </View>
+        <View style={styles.countBadge}>
+          <Text style={styles.countText} numberOfLines={1}>
+            {total}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.searchRow}>
+        <View style={styles.searchBox}>
+          <Search color={colors.gray} size={20} strokeWidth={2.2} />
+          <TextInput
+            style={styles.input}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Tên, thương hiệu hoặc SKU"
+            placeholderTextColor={colors.muted}
+            returnKeyType="search"
+            accessibilityLabel="Tìm kiếm catalog"
+          />
+          {query ? (
+            <Pressable
+              style={styles.clearButton}
+              onPress={() => setQuery("")}
+              accessibilityRole="button"
+              accessibilityLabel="Xóa từ khóa"
+            >
+              <X color={colors.gray} size={18} strokeWidth={2.4} />
+            </Pressable>
+          ) : null}
+        </View>
+        <Pressable
+          style={({ pressed }) => [
+            styles.filterButton,
+            activeFilterCount > 0 ? styles.filterButtonActive : null,
+            pressed ? styles.pressed : null,
+          ]}
+          onPress={onFilter}
+          accessibilityRole="button"
+          accessibilityLabel="Mở bộ lọc thông số"
+        >
+          <SlidersHorizontal
+            color={
+              activeFilterCount > 0 ? colors.white : colors.primary
+            }
+            size={20}
+            strokeWidth={2.4}
+          />
+          {activeFilterCount > 0 ? (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>
+                {activeFilterCount}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
+      </View>
     </View>
+  );
+}
+
+function CategoryChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={({ pressed }) => [
+        styles.categoryChip,
+        selected ? styles.categoryChipSelected : null,
+        pressed ? styles.pressed : null,
+      ]}
+    >
+      <Text
+        style={[
+          styles.categoryLabel,
+          selected ? styles.categoryLabelSelected : null,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
-  content: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 28 },
+  content: {
+    paddingHorizontal: spacing.px16,
+    paddingTop: spacing.px4,
+    paddingBottom: spacing.px56,
+  },
+  headerWrap: {
+    paddingHorizontal: spacing.px16,
+  },
   columns: { justifyContent: "space-between" },
-  headingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  eyebrow: { color: colors.primary, fontSize: 11, fontWeight: "900" },
-  heading: { color: colors.text, fontSize: 24, fontWeight: "900", marginTop: 3 },
-  countBadge: { minWidth: 42, height: 32, borderRadius: 8, backgroundColor: colors.surfaceMuted, alignItems: "center", justifyContent: "center" },
-  countText: { color: colors.text, fontSize: 12, fontWeight: "800" },
-  searchBox: { minHeight: 52, flexDirection: "row", alignItems: "center", backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, marginTop: 18 },
-  input: { flex: 1, color: colors.text, fontSize: 14, paddingHorizontal: 10, paddingVertical: 0 },
-  clearButton: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  categoryList: { paddingVertical: 14, gap: 8 },
-  categoryChip: { minHeight: 40, justifyContent: "center", backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 8, paddingHorizontal: 14 },
-  categoryChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  categoryLabel: { color: colors.gray, fontSize: 12, fontWeight: "700" },
+  hero: {
+    paddingTop: spacing.px8,
+    paddingBottom: spacing.px4,
+  },
+  heroTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: spacing.px8,
+    gap: spacing.px12,
+  },
+  heroHeading: { flex: 1, minWidth: 0 },
+  eyebrow: {
+    ...typography.eyebrow,
+    color: colors.primary,
+  },
+  heading: {
+    ...typography.h2,
+    color: colors.text,
+    marginTop: 4,
+  },
+  countBadge: {
+    minWidth: 44,
+    height: 32,
+    borderRadius: colors.radius.pill,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.px12,
+    flexShrink: 0,
+  },
+  countText: {
+    ...typography.bodyStrong,
+    color: colors.primary,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.px10,
+    marginTop: spacing.px8,
+  },
+  searchBox: {
+    flex: 1,
+    minHeight: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: colors.radius.lg,
+    paddingHorizontal: spacing.px14,
+  },
+  input: {
+    ...typography.body,
+    flex: 1,
+    color: colors.text,
+    paddingHorizontal: spacing.px10,
+    paddingVertical: 0,
+    margin: 0,
+  },
+  clearButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterButton: {
+    width: 50,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: colors.radius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+    position: "relative",
+  },
+  filterButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  filterBadge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
+  filterBadgeText: {
+    ...typography.micro,
+    color: colors.white,
+  },
+  activeFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.px10,
+    marginTop: spacing.px12,
+  },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.primaryLight,
+    borderRadius: colors.radius.pill,
+  },
+  filterPillText: {
+    ...typography.captionStrong,
+    color: colors.primary,
+  },
+  clearFilterBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  clearFilterText: {
+    ...typography.captionStrong,
+    color: colors.danger,
+  },
+  categoryList: { paddingVertical: spacing.px12, gap: spacing.px8 },
+  categoryChip: {
+    minHeight: 40,
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: colors.radius.pill,
+    paddingHorizontal: spacing.px16,
+  },
+  categoryChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  categoryLabel: {
+    ...typography.captionStrong,
+    color: colors.gray,
+  },
   categoryLabelSelected: { color: colors.white },
-  errorBox: { backgroundColor: colors.redLight, borderColor: "#FECACA", borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 12 },
-  errorText: { color: colors.red, fontSize: 12 },
-  retryText: { color: colors.primary, fontSize: 11, fontWeight: "800", marginTop: 5 },
-  empty: { alignItems: "center", paddingVertical: 64, paddingHorizontal: 28 },
-  emptyTitle: { color: colors.text, fontSize: 15, fontWeight: "900", marginTop: 10 },
-  stateText: { color: colors.gray, fontSize: 12, lineHeight: 18, marginTop: 7, textAlign: "center" },
-  footerLoader: { marginVertical: 18 },
+  categoryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: spacing.px16,
+    paddingBottom: spacing.px12,
+  },
+  errorBox: {
+    backgroundColor: colors.dangerLight,
+    borderColor: colors.dangerSoft,
+    borderWidth: 1,
+    borderRadius: colors.radius.md,
+    padding: spacing.px12,
+    marginBottom: spacing.px12,
+  },
+  errorText: {
+    ...typography.caption,
+    color: colors.danger,
+  },
+  retryText: {
+    ...typography.captionStrong,
+    color: colors.primary,
+    marginTop: 4,
+  },
+  resultsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: spacing.px8,
+    marginBottom: spacing.px12,
+  },
+  resultsLabel: {
+    ...typography.captionStrong,
+    color: colors.gray,
+  },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
+  footerLoader: { marginVertical: spacing.px18 },
 });

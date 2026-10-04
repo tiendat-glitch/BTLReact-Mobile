@@ -10,7 +10,7 @@ export type Promotion = {
 };
 
 export async function getPromotions(): Promise<Promotion[]> {
-  const payload = await apiGet("/promotions");
-  return Array.isArray(payload.data) ? payload.data : [];
+  const { data } = await apiGet<Promotion[]>("/promotions");
+  return Array.isArray(data) ? data : [];
 }
 

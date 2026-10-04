@@ -58,6 +58,7 @@ const adaptFavorite = (row: FavoriteRow): CatalogProduct => {
       stockQuantity > 0 ? `Còn ${stockQuantity} sản phẩm` : "Tạm hết hàng",
     emoji: categoryIcons[row.category_slug] || "⌁",
     imageUrl: row.thumbnail_url,
+    images: row.thumbnail_url ? [row.thumbnail_url] : [],
     sku: row.sku,
     variantName: row.variant_name,
     description: row.description || "Chưa có mô tả sản phẩm.",
@@ -77,12 +78,22 @@ const adaptFavorite = (row: FavoriteRow): CatalogProduct => {
 };
 
 export async function getFavorites(): Promise<CatalogProduct[]> {
-  const payload = await apiGet("/favorites");
-  return (Array.isArray(payload.data) ? payload.data : []).map(adaptFavorite);
+  const { data } = await apiGet<
+    FavoriteRow[] | { data?: FavoriteRow[]; items?: FavoriteRow[] }
+  >("/favorites");
+  const rows = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : Array.isArray(data?.items)
+        ? data.items
+        : [];
+  return rows.map(adaptFavorite);
 }
 
 export async function getFavoriteStatus(productId: string) {
-  return (await apiGet(`/favorites/${productId}/status`)).data.favorited as boolean;
+  const favorites = await getFavorites();
+  return favorites.some((product) => product.id === String(productId));
 }
 
 export async function addFavorite(productId: string) {
@@ -92,4 +103,3 @@ export async function addFavorite(productId: string) {
 export async function removeFavorite(productId: string) {
   await apiDelete(`/favorites/${productId}`);
 }
-

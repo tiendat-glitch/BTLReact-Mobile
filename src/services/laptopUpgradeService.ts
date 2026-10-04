@@ -31,11 +31,14 @@ export type UpgradeValidation = {
   unitPrice: number;
 };
 
-export async function getLaptopUpgradeOptions(productId: string): Promise<{
-  profile: UpgradeProfile;
-  options: UpgradeOption[];
-}> {
-  return (await apiGet(`/laptops/${productId}/upgrades`)).data;
+export async function getLaptopUpgradeOptions(
+  productId: string,
+): Promise<{ profile: UpgradeProfile; options: UpgradeOption[] }> {
+  const { data } = await apiGet<{
+    profile: UpgradeProfile;
+    options: UpgradeOption[];
+  }>(`/laptops/${productId}/upgrades`);
+  return data;
 }
 
 export async function validateLaptopUpgrade(
@@ -44,8 +47,11 @@ export async function validateLaptopUpgrade(
     productVariantId: string;
     ramOptionId?: number | string;
     ssdOptionId?: number | string;
-  }
+  },
 ): Promise<UpgradeValidation> {
-  return (await apiPost(`/laptops/${productId}/upgrade/validate`, data)).data;
+  const result = await apiPost<UpgradeValidation>(
+    `/laptops/${productId}/upgrade/validate`,
+    data,
+  );
+  return result.data;
 }
-

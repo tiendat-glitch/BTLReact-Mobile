@@ -40,38 +40,43 @@ export type BuildValidation = {
   estimatedTotal: number;
 };
 
-export async function getPcBuilderOptions(): Promise<Record<ComponentType, PcComponent[]>> {
-  const payload = await apiGet("/pc-builder/options");
-  const result = {} as Record<ComponentType, PcComponent[]>;
-  Object.entries(payload.data as Record<ComponentType, RawComponent[]>).forEach(
-    ([type, rows]) => {
-      const products = adaptCatalogRows(rows) as CatalogProduct[];
-      result[type as ComponentType] = products.map((product, index) => {
-        const raw = rows[index];
-        return {
-          ...product,
-          componentType: raw.component_type,
-          socket: raw.socket,
-          memoryType: raw.memory_type,
-          recommendedPsuWatts: raw.recommended_psu_watts,
-          psuWatts: raw.psu_watts,
-          lengthMm: raw.length_mm,
-          maxGpuLengthMm: raw.max_gpu_length_mm,
-        };
-      });
-    }
+export async function getPcBuilderOptions(): Promise<
+  Record<ComponentType, PcComponent[]>
+> {
+  const { data } = await apiGet<Record<ComponentType, RawComponent[]>>(
+    "/pc-builder/options",
   );
+  const result = {} as Record<ComponentType, PcComponent[]>;
+  Object.entries(data).forEach(([type, rows]) => {
+    const products = adaptCatalogRows(rows) as CatalogProduct[];
+    result[type as ComponentType] = products.map((product, index) => {
+      const raw = rows[index];
+      return {
+        ...product,
+        componentType: raw.component_type,
+        socket: raw.socket,
+        memoryType: raw.memory_type,
+        recommendedPsuWatts: raw.recommended_psu_watts,
+        psuWatts: raw.psu_watts,
+        lengthMm: raw.length_mm,
+        maxGpuLengthMm: raw.max_gpu_length_mm,
+      };
+    });
+  });
   return result;
 }
 
 export async function validatePcBuild(
-  selections: Partial<Record<ComponentType, PcComponent>>
+  selections: Partial<Record<ComponentType, PcComponent>>,
 ): Promise<BuildValidation> {
   const items = Object.entries(selections).map(([componentType, product]) => ({
     componentType,
     productVariantId: product?.variantId,
     quantity: 1,
   }));
-  return (await apiPost("/pc-builder/validate", { items })).data;
+  const { data } = await apiPost<BuildValidation>(
+    "/pc-builder/validate",
+    { items },
+  );
+  return data;
 }
-

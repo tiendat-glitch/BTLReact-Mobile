@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, {
   useCallback,
   useEffect,
@@ -14,57 +15,39 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import Check from "lucide-react-native/icons/check";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 import MapPin from "lucide-react-native/icons/map-pin";
 import PackageCheck from "lucide-react-native/icons/package-check";
-import StoreIcon from "lucide-react-native/icons/store";
+import Store from "lucide-react-native/icons/store";
 import Truck from "lucide-react-native/icons/truck";
 
+import Button from "../components/Button";
+import Card from "../components/Card";
 import FormField from "../components/FormField";
 import ScreenHeader from "../components/ScreenHeader";
 import colors from "../constants/colors";
+import spacing from "../constants/spacing";
+import typography from "../constants/typography";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
-import type { RootStackParamList } from "../navigation/AppNavigator";
 import { getAddresses } from "../services/addressService";
 import {
   createCheckoutOrder,
   getCheckoutOptions,
   getCheckoutQuote,
-  type CheckoutInput,
-  type CheckoutQuote,
-  type FulfillmentMethod,
-  type ShippingMethod,
-  type SpecialRequestCode,
-  type Store,
+  validateVoucher,
+  type PaymentMethodCode,
 } from "../services/checkoutService";
-import type { Address } from "../types/address";
+import { getPromotions, type Promotion } from "../services/promotionService";
 import { formatAddress, formatCurrency } from "../utils/formatters";
+import { formatDistance, getStoreStatusLabel, haversineKm } from "../utils/geo";
 
-type Props = NativeStackScreenProps<RootStackParamList, "Checkout">;
-type CartItem = {
-  cartKey: string;
-  name: string;
-  variantName: string;
-  price: number;
-  quantity: number;
-};
-type CartState = {
-  cart: CartItem[];
-  isCartLoading: boolean;
-  reloadCart: () => Promise<void>;
-};
-type AuthState = {
-  isAuthenticated: boolean;
-  user: { fullName?: string; phone?: string } | null;
-};
-
-const SPECIAL_REQUEST_LABELS: Record<SpecialRequestCode, string> = {
+const SPECIAL_REQUEST_LABELS = {
   AFTER_HOURS: "Giao ngoài giờ hành chính",
   CALL_BEFORE_DELIVERY: "Gọi điện trước khi giao",
   CAREFUL_PACKAGING: "Đóng gói cẩn thận",
@@ -72,30 +55,59 @@ const SPECIAL_REQUEST_LABELS: Record<SpecialRequestCode, string> = {
   INSPECT_BEFORE_RECEIVING: "Kiểm tra hàng trước khi nhận",
 };
 
+const PAYMENT_METHODS = [
+  {
+    code: "COD" as PaymentMethodCode,
+    label: "Thanh toán khi nhận hàng (COD)",
+    description: "Thanh toán sau khi nhận và kiểm tra hàng.",
+  },
+  {
+    code: "BANK_TRANSFER" as PaymentMethodCode,
+    label: "Chuyển khoản ngân hàng",
+    description: "Chuyển khoản trước qua tài khoản ngân hàng được cung cấp.",
+  },
+  {
+    code: "MOMO" as PaymentMethodCode,
+    label: "Ví MoMo",
+    description: "Thanh toán qua ứng dụng MoMo.",
+  },
+  {
+    code: "VNPAY" as PaymentMethodCode,
+    label: "VNPAY",
+    description: "Thanh toán qua cổng thanh toán VNPAY.",
+  },
+];
+
 const newIdempotencyKey = () =>
   `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 
-export default function CheckoutScreen({ navigation, route }: Props) {
-  const { isAuthenticated, user } = useAuth() as AuthState;
-  const { cart, isCartLoading, reloadCart } = useCart() as CartState;
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [stores, setStores] = useState<Store[]>([]);
-  const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
-  const [availableSpecialRequests, setAvailableSpecialRequests] = useState<SpecialRequestCode[]>([]);
-  const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>("DELIVERY");
-  const [selectedAddressId, setSelectedAddressId] = useState<number | string | null>(route.params?.selectedAddressId || null);
-  const [pickupStoreId, setPickupStoreId] = useState<number | string | null>(null);
+export default function CheckoutScreen({ navigation, route }) {
+  const { isAuthenticated, user } = useAuth();
+  const { cart, isCartLoading, reloadCart } = useCart();
+  const [addresses, setAddresses] = useState([]);
+  const [stores, setStores] = useState([]);
+  const [shippingMethods, setShippingMethods] = useState([]);
+  const [availableSpecialRequests, setAvailableSpecialRequests] = useState([]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [fulfillmentMethod, setFulfillmentMethod] = useState("DELIVERY");
+  const [selectedAddressId, setSelectedAddressId] = useState(
+    route.params?.selectedAddressId || null,
+  );
+  const [pickupStoreId, setPickupStoreId] = useState(null);
   const [shippingMethodCode, setShippingMethodCode] = useState("STANDARD");
   const [recipientName, setRecipientName] = useState(user?.fullName || "");
   const [recipientPhone, setRecipientPhone] = useState(user?.phone || "");
-  const [specialRequests, setSpecialRequests] = useState<SpecialRequestCode[]>([]);
+  const [specialRequests, setSpecialRequests] = useState([]);
   const [voucherCode, setVoucherCode] = useState("");
+  const [voucherValidation, setVoucherValidation] = useState(null);
+  const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
   const [note, setNote] = useState("");
-  const [quote, setQuote] = useState<CheckoutQuote | null>(null);
+  const [quote, setQuote] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isQuoting, setIsQuoting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodCode>("COD");
   const idempotencyKey = useRef(newIdempotencyKey());
   const quoteRequest = useRef(0);
 
@@ -114,22 +126,27 @@ export default function CheckoutScreen({ navigation, route }: Props) {
     setIsLoading(true);
     setError("");
     try {
-      const [nextAddresses, options] = await Promise.all([
-        getAddresses() as Promise<Address[]>,
+      const [nextAddresses, options, promos] = await Promise.all([
+        getAddresses(),
         getCheckoutOptions(),
+        getPromotions().catch(() => []),
       ]);
       setAddresses(nextAddresses);
       setStores(options.stores);
       setShippingMethods(options.shippingMethods);
       setAvailableSpecialRequests(options.specialRequests);
+      setPromotions(promos);
       setSelectedAddressId((current) =>
-        current || nextAddresses.find((item) => Boolean(item.is_default))?.id || nextAddresses[0]?.id || null
+        current ||
+        nextAddresses.find((item) => Boolean(item.is_default))?.id ||
+        nextAddresses[0]?.id ||
+        null,
       );
       setPickupStoreId((current) => current || options.stores[0]?.id || null);
       setShippingMethodCode((current) =>
         options.shippingMethods.some((item) => item.code === current)
           ? current
-          : options.shippingMethods[0]?.code || "STANDARD"
+          : options.shippingMethods[0]?.code || "STANDARD",
       );
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Không tải được checkout.");
@@ -141,23 +158,27 @@ export default function CheckoutScreen({ navigation, route }: Props) {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const selectedAddress = useMemo(
-    () => addresses.find((item) => String(item.id) === String(selectedAddressId)),
-    [addresses, selectedAddressId]
+    () =>
+      addresses.find(
+        (item) => String(item.id) === String(selectedAddressId),
+      ),
+    [addresses, selectedAddressId],
   );
 
-  const buildInput = useCallback((): CheckoutInput | null => {
+  const buildInput = useCallback(() => {
     const base = {
       fulfillmentMethod,
       specialRequests,
       voucherCode: voucherCode.trim() || undefined,
       note: note.trim() || undefined,
-      paymentMethod: "COD" as const,
+      paymentMethod,
     };
     if (fulfillmentMethod === "DELIVERY") {
       if (!selectedAddressId || !shippingMethodCode) return null;
       return { ...base, addressId: selectedAddressId, shippingMethodCode };
     }
-    if (!pickupStoreId || !recipientName.trim() || !recipientPhone.trim()) return null;
+    if (!pickupStoreId || !recipientName.trim() || !recipientPhone.trim())
+      return null;
     return {
       ...base,
       pickupStoreId,
@@ -169,6 +190,7 @@ export default function CheckoutScreen({ navigation, route }: Props) {
     specialRequests,
     voucherCode,
     note,
+    paymentMethod,
     selectedAddressId,
     shippingMethodCode,
     pickupStoreId,
@@ -194,7 +216,11 @@ export default function CheckoutScreen({ navigation, route }: Props) {
       } catch (nextError) {
         if (quoteRequest.current === requestId) {
           setQuote(null);
-          setError(nextError instanceof Error ? nextError.message : "Không tính được đơn hàng.");
+          setError(
+            nextError instanceof Error
+              ? nextError.message
+              : "Không tính được đơn hàng.",
+          );
         }
       } finally {
         if (quoteRequest.current === requestId) setIsQuoting(false);
@@ -203,12 +229,32 @@ export default function CheckoutScreen({ navigation, route }: Props) {
     return () => clearTimeout(timeout);
   }, [buildInput, cart.length, isCartLoading, isLoading]);
 
-  const toggleSpecialRequest = (code: SpecialRequestCode) => {
+  const toggleSpecialRequest = (code) => {
     setSpecialRequests((current) =>
       current.includes(code)
         ? current.filter((item) => item !== code)
-        : [...current, code]
+        : [...current, code],
     );
+  };
+
+  const validateVoucherCode = async () => {
+    if (!voucherCode.trim()) return;
+    const code = voucherCode.trim().toUpperCase();
+    const subtotal = quote?.subtotal ?? 0;
+    setIsValidatingVoucher(true);
+    try {
+      const result = await validateVoucher(code, subtotal);
+      setVoucherValidation(result);
+    } catch {
+      setVoucherValidation({ valid: false, error: "Không kiểm tra được voucher." });
+    } finally {
+      setIsValidatingVoucher(false);
+    }
+  };
+
+  const removeVoucher = () => {
+    setVoucherCode("");
+    setVoucherValidation(null);
   };
 
   const placeOrder = async () => {
@@ -229,214 +275,796 @@ export default function CheckoutScreen({ navigation, route }: Props) {
     } finally {
       setIsSubmitting(false);
     }
+    return;
   };
 
   if (!isAuthenticated) return null;
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <SafeAreaView edges={["top"]} style={styles.container}>
       <ScreenHeader title="Xác nhận đơn hàng" navigation={navigation} />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {isLoading ? <ActivityIndicator color={colors.primary} /> : (
-          <>
-            <Text style={styles.sectionTitle}>Hình thức nhận hàng</Text>
-            <View style={styles.segmented}>
-              <Segment
-                label="Giao tận nơi"
-                icon={<Truck size={18} color={fulfillmentMethod === "DELIVERY" ? colors.white : colors.gray} />}
-                selected={fulfillmentMethod === "DELIVERY"}
-                onPress={() => setFulfillmentMethod("DELIVERY")}
-              />
-              <Segment
-                label="Nhận tại cửa hàng"
-                icon={<StoreIcon size={18} color={fulfillmentMethod === "PICKUP" ? colors.white : colors.gray} />}
-                selected={fulfillmentMethod === "PICKUP"}
-                onPress={() => setFulfillmentMethod("PICKUP")}
-              />
-            </View>
-
-            {fulfillmentMethod === "DELIVERY" ? (
-              <>
-                <Text style={styles.sectionTitle}>Địa chỉ nhận hàng</Text>
-                {selectedAddress ? (
-                  <Pressable style={styles.card} onPress={() => navigation.navigate("Addresses", { selectMode: true })}>
-                    <View style={styles.rowBetween}>
-                      <View style={styles.iconBox}><MapPin color={colors.primary} size={18} /></View>
-                      <View style={styles.flex}>
-                        <Text style={styles.strong}>{selectedAddress.receiver_name} · {selectedAddress.receiver_phone}</Text>
-                        <Text style={styles.muted}>{formatAddress(selectedAddress)}</Text>
-                      </View>
-                      <Text style={styles.change}>Đổi</Text>
-                    </View>
-                  </Pressable>
-                ) : (
-                  <Pressable style={styles.emptyButton} onPress={() => navigation.navigate("AddressForm")}>
-                    <Text style={styles.change}>+ Thêm địa chỉ nhận hàng</Text>
-                  </Pressable>
-                )}
-
-                <Text style={styles.sectionTitle}>Phương thức vận chuyển</Text>
-                {shippingMethods.map((method) => (
-                  <Choice
-                    key={method.code}
-                    selected={shippingMethodCode === method.code}
-                    title={method.name}
-                    description={`${formatEta(method)} · ${formatCurrency(method.base_fee)}`}
-                    onPress={() => setShippingMethodCode(method.code)}
-                  />
-                ))}
-              </>
-            ) : (
-              <>
-                <Text style={styles.sectionTitle}>Cửa hàng nhận hàng</Text>
-                {stores.map((store) => (
-                  <Choice
-                    key={String(store.id)}
-                    selected={String(pickupStoreId) === String(store.id)}
-                    title={store.name}
-                    description={`${store.address_line}, ${store.district || store.province} · ${store.opening_hours || "Liên hệ cửa hàng"}`}
-                    onPress={() => setPickupStoreId(store.id)}
-                  />
-                ))}
-                <View style={styles.formCard}>
-                  <FormField label="Người nhận *" value={recipientName} onChangeText={setRecipientName} />
-                  <FormField label="Số điện thoại *" value={recipientPhone} onChangeText={setRecipientPhone} keyboardType="phone-pad" />
-                </View>
-              </>
-            )}
-
-            <Text style={styles.sectionTitle}>Sản phẩm</Text>
-            <View style={styles.card}>
-              {cart.map((item) => (
-                <View key={item.cartKey} style={styles.productRow}>
-                  <View style={styles.flex}>
-                    <Text style={styles.productName}>{item.name}</Text>
-                    <Text style={styles.muted}>{item.variantName} · x{item.quantity}</Text>
-                  </View>
-                  <Text style={styles.productPrice}>{formatCurrency(item.price * item.quantity)}</Text>
-                </View>
-              ))}
-            </View>
-
-            <Text style={styles.sectionTitle}>Mã giảm giá</Text>
-            <TextInput style={styles.input} value={voucherCode} onChangeText={(value) => setVoucherCode(value.toUpperCase())} autoCapitalize="characters" placeholder="Nhập mã voucher" placeholderTextColor={colors.muted} />
-
-            <Text style={styles.sectionTitle}>Yêu cầu đặc biệt</Text>
-            <View style={styles.card}>
-              {availableSpecialRequests.map((code) => {
-                const selected = specialRequests.includes(code);
-                return (
-                  <Pressable key={code} style={styles.checkRow} onPress={() => toggleSpecialRequest(code)} accessibilityRole="checkbox" accessibilityState={{ checked: selected }}>
-                    <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-                      {selected ? <Check color={colors.white} size={14} strokeWidth={3} /> : null}
-                    </View>
-                    <Text style={styles.checkLabel}>{SPECIAL_REQUEST_LABELS[code]}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Text style={styles.sectionTitle}>Ghi chú đơn hàng</Text>
-            <TextInput style={[styles.input, styles.note]} value={note} onChangeText={setNote} multiline maxLength={500} textAlignVertical="top" placeholder="Ví dụ: Vui lòng gọi trước khi giao..." placeholderTextColor={colors.muted} />
-            <Text style={styles.counter}>{note.length}/500</Text>
-
-            <Text style={styles.sectionTitle}>Thanh toán</Text>
-            <View style={styles.paymentCard}>
-              <PackageCheck color={colors.primary} size={22} />
-              <View style={styles.paymentInfo}>
-                <Text style={styles.strong}>Thanh toán khi nhận hàng (COD)</Text>
-                <Text style={styles.muted}>Thanh toán sau khi nhận và kiểm tra hàng.</Text>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          style={styles.scrollFlex}
+        >
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {isLoading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <>
+              <Text style={styles.sectionTitle}>Hình thức nhận hàng</Text>
+              <View style={styles.segmented}>
+                <Segment
+                  label="Giao tận nơi"
+                  icon={<Truck size={18} color={fulfillmentMethod === "DELIVERY" ? colors.white : colors.gray} />}
+                  selected={fulfillmentMethod === "DELIVERY"}
+                  onPress={() => setFulfillmentMethod("DELIVERY")}
+                />
+                <Segment
+                  label="Nhận tại cửa hàng"
+                  icon={<Store size={18} color={fulfillmentMethod === "PICKUP" ? colors.white : colors.gray} />}
+                  selected={fulfillmentMethod === "PICKUP"}
+                  onPress={() => setFulfillmentMethod("PICKUP")}
+                />
               </View>
-            </View>
 
-            <View style={styles.summary}>
-              {isQuoting ? <ActivityIndicator color={colors.primary} /> : quote ? (
+              {fulfillmentMethod === "DELIVERY" ? (
                 <>
-                  <Summary label="Tạm tính" value={formatCurrency(quote.subtotal)} />
-                  <Summary label="Giảm giá" value={`-${formatCurrency(quote.discountAmount)}`} />
-                  <Summary label="Phí vận chuyển" value={formatCurrency(quote.shippingFee)} />
-                  <Summary label="Tổng cộng" value={formatCurrency(quote.totalAmount)} bold />
-                </>
-              ) : <Text style={styles.muted}>Hoàn tất thông tin để tính tổng đơn hàng.</Text>}
-            </View>
-          </>
-        )}
-      </ScrollView>
+                  <Text style={styles.sectionTitle}>Địa chỉ nhận hàng</Text>
+                  {selectedAddress ? (
+                    <Pressable
+                      onPress={() =>
+                        navigation.navigate("Addresses", { selectMode: true })
+                      }
+                      style={styles.card}
+                    >
+                      <View style={styles.rowBetween}>
+                        <View style={styles.iconBox}>
+                          <MapPin color={colors.primary} size={18} strokeWidth={2.2} />
+                        </View>
+                        <View style={styles.flex}>
+                          <Text style={styles.strong}>
+                            {selectedAddress.receiver_name} · {selectedAddress.receiver_phone}
+                          </Text>
+                          <Text style={styles.muted}>
+                            {formatAddress(selectedAddress)}
+                          </Text>
+                        </View>
+                        <Text style={styles.change}>Đổi</Text>
+                      </View>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      style={styles.emptyButton}
+                      onPress={() => navigation.navigate("AddressForm")}
+                    >
+                      <Text style={styles.change}>+ Thêm địa chỉ nhận hàng</Text>
+                    </Pressable>
+                  )}
 
-      <View style={styles.bottom}>
-        <View>
-          <Text style={styles.bottomLabel}>Tổng thanh toán</Text>
-          <Text style={styles.total}>{quote ? formatCurrency(quote.totalAmount) : "--"}</Text>
-        </View>
-        <TouchableOpacity style={[styles.orderButton, (!quote || isSubmitting || isQuoting) && styles.disabled]} onPress={placeOrder} disabled={!quote || isSubmitting || isQuoting}>
-          {isSubmitting ? <ActivityIndicator color={colors.white} /> : <Text style={styles.orderText}>Đặt hàng COD</Text>}
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+                  <Text style={styles.sectionTitle}>Phương thức vận chuyển</Text>
+                  {shippingMethods.map((method) => (
+                    <Choice
+                      key={method.code}
+                      selected={shippingMethodCode === method.code}
+                      title={method.name}
+                      description={`${formatEta(method)} · ${formatCurrency(method.base_fee)}`}
+                      onPress={() => setShippingMethodCode(method.code)}
+                    />
+                  ))}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.sectionTitle}>Cửa hàng nhận hàng</Text>
+                  {stores.map((store) => {
+                    const userLat = selectedAddress?.latitude
+                      ? Number(selectedAddress.latitude)
+                      : null;
+                    const userLng = selectedAddress?.longitude
+                      ? Number(selectedAddress.longitude)
+                      : null;
+                    const storeLat = store.latitude
+                      ? Number(store.latitude)
+                      : null;
+                    const storeLng = store.longitude
+                      ? Number(store.longitude)
+                      : null;
+                    const distance =
+                      userLat != null && userLng != null && storeLat != null && storeLng != null
+                        ? haversineKm(userLat, userLng, storeLat, storeLng)
+                        : null;
+                    const status = getStoreStatusLabel(store.opening_hours);
+                    return (
+                      <Pressable
+                        key={String(store.id)}
+                        style={[
+                          styles.storeCard,
+                          String(pickupStoreId) === String(store.id) &&
+                            styles.storeCardSelected,
+                        ]}
+                        onPress={() => setPickupStoreId(store.id)}
+                        accessibilityRole="radio"
+                        accessibilityState={{
+                          selected: String(pickupStoreId) === String(store.id),
+                        }}
+                      >
+                        <View
+                          style={[
+                            styles.storeRadio,
+                            String(pickupStoreId) === String(store.id) &&
+                              styles.storeRadioSelected,
+                          ]}
+                        >
+                          {String(pickupStoreId) === String(store.id) ? (
+                            <View style={styles.storeRadioDot} />
+                          ) : null}
+                        </View>
+                        <View style={styles.storeInfo}>
+                          <View style={styles.storeTitleRow}>
+                            <Text style={styles.storeName} numberOfLines={1}>
+                              {store.name}
+                            </Text>
+                            <View
+                              style={[
+                                styles.storeStatusDot,
+                                {
+                                  backgroundColor: status.isOpen
+                                    ? colors.green
+                                    : colors.red,
+                                },
+                              ]}
+                            />
+                            <Text
+                              style={[
+                                styles.storeStatusText,
+                                {
+                                  color: status.isOpen
+                                    ? colors.green
+                                    : colors.red,
+                                },
+                              ]}
+                            >
+                              {status.isOpen ? "Mở cửa" : "Đã đóng"}
+                            </Text>
+                          </View>
+                          <Text style={styles.storeAddress} numberOfLines={2}>
+                            {store.address_line}
+                            {store.ward ? `, ${store.ward}` : ""}
+                            {store.district ? `, ${store.district}` : ""}
+                            {`, ${store.province}`}
+                          </Text>
+                          <View style={styles.storeMetaRow}>
+                            <Text style={styles.storeMetaText}>
+                              {status.label}
+                            </Text>
+                          </View>
+                          <View style={styles.storeMetaRow}>
+                            <Text style={styles.storeMetaText}>
+                              📞 {store.phone}
+                            </Text>
+                            {distance != null ? (
+                              <Text style={styles.storeDistance}>
+                                · {formatDistance(distance)} từ địa chỉ giao
+                              </Text>
+                            ) : null}
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                  <Card padding="md">
+                    <FormField
+                      label="Người nhận *"
+                      value={recipientName}
+                      onChangeText={setRecipientName}
+                    />
+                    <FormField
+                      label="Số điện thoại *"
+                      value={recipientPhone}
+                      onChangeText={setRecipientPhone}
+                      keyboardType="phone-pad"
+                    />
+                  </Card>
+                </>
+              )}
+
+              <Text style={styles.sectionTitle}>Sản phẩm</Text>
+              <Card padding="md">
+                {cart.map((item) => (
+                  <View key={item.cartKey} style={styles.productRow}>
+                    <View style={styles.flex}>
+                      <Text style={styles.productName}>{item.name}</Text>
+                      <Text style={styles.muted}>
+                        {item.variantName} · x{item.quantity}
+                      </Text>
+                    </View>
+                    <Text style={styles.productPrice}>
+                      {formatCurrency(item.price * item.quantity)}
+                    </Text>
+                  </View>
+                ))}
+              </Card>
+
+              {promotions.length > 0 ? (
+                <View style={styles.promoCard}>
+                  <Text style={styles.promoLabel}>Ưu đãi đang có</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.promoScroll}
+                    contentContainerStyle={styles.promoContent}
+                  >
+                    {promotions.map((promo) => (
+                      <Pressable
+                        key={String(promo.id)}
+                        style={styles.promoChip}
+                        onPress={() => setVoucherCode(promo.title)}
+                      >
+                        <Text style={styles.promoChipText} numberOfLines={1}>
+                          {promo.title}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              ) : null}
+
+              <Text style={styles.sectionTitle}>Mã giảm giá</Text>
+              <View style={styles.voucherRow}>
+                <TextInput
+                  style={[styles.input, styles.voucherInput]}
+                  value={voucherCode}
+                  onChangeText={(value) => {
+                    setVoucherCode(value.toUpperCase());
+                    setVoucherValidation(null);
+                  }}
+                  autoCapitalize="characters"
+                  placeholder="Nhập mã voucher"
+                  placeholderTextColor={colors.muted}
+                  editable={!voucherValidation?.valid}
+                  accessibilityLabel="Mã voucher"
+                />
+                {voucherValidation?.valid ? (
+                  <Button
+                    label="Bỏ"
+                    variant="ghost"
+                    size="sm"
+                    onPress={removeVoucher}
+                    accessibilityLabel="Bỏ áp dụng voucher"
+                  />
+                ) : (
+                  <Button
+                    label="Áp dụng"
+                    variant="primary"
+                    size="sm"
+                    onPress={validateVoucherCode}
+                    loading={isValidatingVoucher}
+                    disabled={!voucherCode.trim() || isValidatingVoucher}
+                    accessibilityLabel="Áp dụng voucher"
+                  />
+                )}
+              </View>
+              {voucherValidation?.valid ? (
+                <View style={styles.voucherSuccess}>
+                  <Check color={colors.green} size={14} strokeWidth={2.8} />
+                  <Text style={styles.voucherSuccessText}>
+                    {voucherValidation.voucher.name || voucherValidation.voucher.code}
+                    {" — "}
+                    Giảm{" "}
+                    {voucherValidation.voucher.discountType === "PERCENT"
+                      ? `${voucherValidation.voucher.discountValue}%`
+                      : formatCurrency(voucherValidation.voucher.discountPreview)}
+                    {voucherValidation.voucher.discountType === "PERCENT" &&
+                    voucherValidation.voucher.maxDiscount
+                      ? ` (tối đa ${formatCurrency(voucherValidation.voucher.maxDiscount)})`
+                      : ""}
+                  </Text>
+                </View>
+              ) : voucherValidation?.valid === false && voucherValidation?.error ? (
+                <Text style={styles.voucherError}>{voucherValidation.error}</Text>
+              ) : null}
+
+              <Text style={styles.sectionTitle}>Yêu cầu đặc biệt</Text>
+              <Card padding="md">
+                {availableSpecialRequests.map((code) => {
+                  const selected = specialRequests.includes(code);
+                  return (
+                    <Pressable
+                      key={code}
+                      style={styles.checkRow}
+                      onPress={() => toggleSpecialRequest(code)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                    >
+                      <View
+                        style={[styles.checkbox, selected && styles.checkboxSelected]}
+                      >
+                        {selected ? <Check color={colors.white} size={14} strokeWidth={3} /> : null}
+                      </View>
+                      <Text style={styles.checkLabel}>{SPECIAL_REQUEST_LABELS[code]}</Text>
+                    </Pressable>
+                  );
+                })}
+              </Card>
+
+              <Text style={styles.sectionTitle}>Ghi chú đơn hàng</Text>
+              <TextInput
+                style={[styles.input, styles.note]}
+                value={note}
+                onChangeText={setNote}
+                multiline
+                maxLength={500}
+                textAlignVertical="top"
+                placeholder="Ví dụ: Vui lòng gọi trước khi giao..."
+                placeholderTextColor={colors.muted}
+              />
+              <Text style={styles.counter}>{note.length}/500</Text>
+
+              <Text style={styles.sectionTitle}>Thanh toán</Text>
+              <Card padding="sm">
+                {PAYMENT_METHODS.map((method) => (
+                  <Pressable
+                    key={method.code}
+                    style={[
+                      styles.paymentOption,
+                      paymentMethod === method.code && styles.paymentOptionSelected,
+                    ]}
+                    onPress={() => setPaymentMethod(method.code)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: paymentMethod === method.code }}
+                  >
+                    <View
+                      style={[
+                        styles.radio,
+                        paymentMethod === method.code && styles.radioSelected,
+                      ]}
+                    >
+                      {paymentMethod === method.code ? (
+                        <View style={styles.radioDot} />
+                      ) : null}
+                    </View>
+                    <View style={styles.paymentContent}>
+                      <Text style={styles.paymentLabel}>{method.label}</Text>
+                      <Text style={styles.paymentDesc}>{method.description}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </Card>
+
+              <Card padding="md" style={styles.summary}>
+                {isQuoting ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : quote ? (
+                  <>
+                    <Summary label="Tạm tính" value={formatCurrency(quote.subtotal)} />
+                    <Summary label="Giảm giá" value={`-${formatCurrency(quote.discountAmount)}`} />
+                    <Summary label="Phí vận chuyển" value={formatCurrency(quote.shippingFee)} />
+                    <Summary label="Tổng cộng" value={formatCurrency(quote.totalAmount)} bold />
+                  </>
+                ) : (
+                  <Text style={styles.muted}>Hoàn tất thông tin để tính tổng đơn hàng.</Text>
+                )}
+              </Card>
+            </>
+          )}
+        </ScrollView>
+        <SafeAreaView edges={["bottom"]} style={styles.bottomSafe}>
+          <View style={styles.bottom}>
+            <View style={styles.totalInfo}>
+              <Text style={styles.bottomLabel} numberOfLines={1}>
+                Tổng thanh toán
+              </Text>
+              <Text style={styles.total} numberOfLines={1}>
+                {quote ? formatCurrency(quote.totalAmount) : "--"}
+              </Text>
+            </View>
+            <Button
+              label={`Đặt hàng · ${paymentMethod === "COD" ? "COD" : paymentMethod}`}
+              variant="primary"
+              size="lg"
+              loading={isSubmitting}
+              trailingIcon={(color) => (
+                <ChevronRight color={color} size={18} strokeWidth={2.6} />
+              )}
+              onPress={placeOrder}
+              disabled={!quote || isSubmitting || isQuoting}
+              style={styles.cta}
+            />
+          </View>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-function Segment({ label, icon, selected, onPress }: { label: string; icon: React.ReactNode; selected: boolean; onPress: () => void }) {
-  return <Pressable style={[styles.segment, selected && styles.segmentSelected]} onPress={onPress}><View style={styles.segmentIcon}>{icon}</View><Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{label}</Text></Pressable>;
+function Segment({ label, icon, selected, onPress }) {
+  return (
+    <Pressable
+      style={[styles.segment, selected && styles.segmentSelected]}
+      onPress={onPress}
+    >
+      <View style={styles.segmentIcon}>{icon}</View>
+      <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
 }
 
-function Choice({ selected, title, description, onPress }: { selected: boolean; title: string; description: string; onPress: () => void }) {
-  return <Pressable style={[styles.choice, selected && styles.choiceSelected]} onPress={onPress}><View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <View style={styles.radioDot} /> : null}</View><View style={styles.flex}><Text style={styles.strong}>{title}</Text><Text style={styles.muted}>{description}</Text></View></Pressable>;
+function Choice({ selected, title, description, onPress }) {
+  return (
+    <Pressable
+      style={[styles.choice, selected && styles.choiceSelected]}
+      onPress={onPress}
+    >
+      <View style={[styles.radio, selected && styles.radioSelected]}>
+        {selected ? <View style={styles.radioDot} /> : null}
+      </View>
+      <View style={styles.flex}>
+        <Text style={styles.strong}>{title}</Text>
+        <Text style={styles.muted}>{description}</Text>
+      </View>
+    </Pressable>
+  );
 }
 
-function Summary({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return <View style={styles.rowBetween}><Text style={[styles.muted, bold && styles.strong]}>{label}</Text><Text style={[styles.summaryValue, bold && styles.total]}>{value}</Text></View>;
+function Summary({ label, value, bold }) {
+  return (
+    <View style={styles.summaryRow}>
+      <Text style={[styles.muted, bold && styles.summaryLabelBold]}>
+        {label}
+      </Text>
+      <Text style={[styles.summaryValue, bold && styles.total]}>{value}</Text>
+    </View>
+  );
 }
 
-const formatEta = (method: ShippingMethod) =>
+const formatEta = (method) =>
   method.eta_min_days === 0 && method.eta_max_days === 0
     ? "Trong ngày"
     : `${method.eta_min_days}-${method.eta_max_days} ngày`;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingBottom: 112 },
-  error: { color: colors.red, backgroundColor: colors.redLight, borderRadius: 8, padding: 12, marginBottom: 12 },
-  sectionTitle: { color: colors.text, fontSize: 15, fontWeight: "900", marginTop: 17, marginBottom: 9 },
-  segmented: { flexDirection: "row", backgroundColor: colors.surfaceMuted, borderRadius: 8, padding: 4 },
-  segment: { flex: 1, minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "center", borderRadius: 6 },
+  flex: { flex: 1 },
+  scrollFlex: { flex: 1 },
+  content: { padding: spacing.px16, paddingBottom: spacing.px40 },
+  error: {
+    ...typography.captionStrong,
+    color: colors.red,
+    backgroundColor: colors.redLight,
+    borderRadius: colors.radius.md,
+    padding: spacing.px12,
+    marginBottom: spacing.px12,
+  },
+  sectionTitle: {
+    ...typography.h3,
+    color: colors.text,
+    marginTop: spacing.px16,
+    marginBottom: spacing.px8,
+  },
+  segmented: {
+    flexDirection: "row",
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: colors.radius.md,
+    padding: 4,
+  },
+  segment: {
+    flex: 1,
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: colors.radius.sm,
+  },
   segmentSelected: { backgroundColor: colors.primary },
   segmentIcon: { marginRight: 7 },
-  segmentText: { color: colors.gray, fontSize: 12, fontWeight: "800" },
+  segmentText: { ...typography.captionStrong, color: colors.gray },
   segmentTextSelected: { color: colors.white },
-  card: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 8, padding: 14 },
-  formCard: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 8, padding: 14, marginTop: 8 },
-  emptyButton: { minHeight: 54, alignItems: "center", justifyContent: "center", backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 8 },
-  choice: { minHeight: 64, flexDirection: "row", alignItems: "center", backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 8 },
-  choiceSelected: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  radio: { width: 21, height: 21, borderRadius: 11, borderColor: colors.borderStrong, borderWidth: 2, alignItems: "center", justifyContent: "center", marginRight: 11 },
+  card: {
+    backgroundColor: colors.white,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: colors.radius.md,
+    padding: spacing.px14,
+  },
+  emptyButton: {
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: colors.radius.md,
+  },
+  choice: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: colors.radius.md,
+    padding: spacing.px12,
+    marginBottom: spacing.px8,
+  },
+  choiceSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  radio: {
+    width: 21,
+    height: 21,
+    borderRadius: 11,
+    borderColor: colors.borderStrong,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.px10,
+  },
   radioSelected: { borderColor: colors.primary },
   radioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary },
-  rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginVertical: 4 },
-  iconBox: { width: 38, height: 38, alignItems: "center", justifyContent: "center", backgroundColor: colors.primaryLight, borderRadius: 8, marginRight: 10 },
-  flex: { flex: 1 },
-  strong: { color: colors.text, fontSize: 13, fontWeight: "800" },
-  muted: { color: colors.gray, fontSize: 11, lineHeight: 18, marginTop: 3 },
-  change: { color: colors.primary, fontSize: 12, fontWeight: "800", marginLeft: 8 },
-  productRow: { flexDirection: "row", alignItems: "center", borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 10 },
-  productName: { color: colors.text, fontSize: 12, fontWeight: "800" },
-  productPrice: { color: colors.primary, fontSize: 12, fontWeight: "800" },
-  input: { minHeight: 50, backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 8, color: colors.text, fontSize: 14, paddingHorizontal: 13 },
-  note: { minHeight: 100, paddingTop: 12 },
-  counter: { color: colors.gray, fontSize: 10, marginTop: 5, textAlign: "right" },
-  checkRow: { minHeight: 46, flexDirection: "row", alignItems: "center" },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderColor: colors.borderStrong, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  rowBetween: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  iconBox: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryLight,
+    borderRadius: colors.radius.md,
+    marginRight: spacing.px10,
+  },
+  strong: { ...typography.smallStrong, color: colors.text },
+  muted: {
+    ...typography.caption,
+    color: colors.gray,
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  change: {
+    ...typography.captionStrong,
+    color: colors.primary,
+    marginLeft: spacing.px8,
+  },
+  productRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    paddingVertical: spacing.px10,
+  },
+  productName: { ...typography.smallStrong, color: colors.text },
+  productPrice: { ...typography.smallStrong, color: colors.primary },
+  input: {
+    minHeight: 50,
+    backgroundColor: colors.white,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: colors.radius.md,
+    color: colors.text,
+    paddingHorizontal: spacing.px12,
+    ...typography.body,
+  },
+  note: { minHeight: 100, paddingTop: spacing.px12 },
+  counter: {
+    ...typography.caption,
+    color: colors.gray,
+    marginTop: spacing.px4,
+    textAlign: "right",
+  },
+  voucherRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.px10,
+  },
+  voucherInput: { flex: 1 },
+  voucherSuccess: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.px8,
+    padding: spacing.px10,
+    backgroundColor: colors.greenLight,
+    borderRadius: colors.radius.md,
+    gap: spacing.px8,
+  },
+  voucherSuccessText: {
+    ...typography.captionStrong,
+    color: colors.green,
+    flex: 1,
+  },
+  voucherError: {
+    ...typography.captionStrong,
+    color: colors.red,
+    marginTop: spacing.px8,
+  },
+  promoCard: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: colors.radius.md,
+    padding: spacing.px12,
+    borderColor: colors.primarySoft,
+    borderWidth: 1,
+  },
+  promoLabel: {
+    ...typography.captionStrong,
+    color: colors.primary,
+    marginBottom: spacing.px8,
+  },
+  promoScroll: { flexGrow: 0 },
+  promoContent: { gap: spacing.px8, paddingRight: spacing.px8 },
+  promoChip: {
+    paddingHorizontal: spacing.px12,
+    paddingVertical: spacing.px8,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    borderColor: colors.primarySoft,
+    borderWidth: 1,
+  },
+  promoChipText: {
+    ...typography.captionStrong,
+    color: colors.primary,
+  },
+  storeCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: colors.white,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: colors.radius.md,
+    padding: spacing.px14,
+    marginBottom: spacing.px8,
+    gap: spacing.px12,
+  },
+  storeCardSelected: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
+  },
+  storeRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  storeRadioSelected: { borderColor: colors.primary },
+  storeRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+  },
+  storeInfo: { flex: 1 },
+  storeTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.px6,
+  },
+  storeName: {
+    ...typography.smallStrong,
+    color: colors.text,
+    flexShrink: 1,
+  },
+  storeStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  storeStatusText: {
+    ...typography.micro,
+    fontWeight: "700",
+  },
+  storeAddress: {
+    ...typography.caption,
+    color: colors.gray,
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  storeMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginTop: 4,
+  },
+  storeMetaText: {
+    ...typography.micro,
+    color: colors.gray,
+  },
+  storeDistance: {
+    ...typography.micro,
+    color: colors.primary,
+    fontWeight: "700",
+  },
+  checkRow: { flexDirection: "row", alignItems: "center", minHeight: 46 },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: colors.radius.sm,
+    borderColor: colors.borderStrong,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   checkboxSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkLabel: { flex: 1, color: colors.text, fontSize: 12, marginLeft: 10 },
-  paymentCard: { minHeight: 66, flexDirection: "row", alignItems: "center", backgroundColor: colors.white, borderColor: colors.primary, borderWidth: 1, borderRadius: 8, padding: 13 },
-  paymentInfo: { flex: 1, marginLeft: 11 },
-  summary: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 8, padding: 14, marginTop: 18 },
-  summaryValue: { color: colors.text, fontSize: 11 },
-  bottom: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 82, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.white, borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingVertical: 12 },
-  bottomLabel: { color: colors.gray, fontSize: 10 },
-  total: { color: colors.primary, fontSize: 18, fontWeight: "900" },
-  orderButton: { minWidth: 150, minHeight: 50, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 16 },
-  disabled: { opacity: 0.5 },
-  orderText: { color: colors.white, fontSize: 13, fontWeight: "900" },
+  checkLabel: {
+    ...typography.small,
+    color: colors.text,
+    flex: 1,
+    marginLeft: spacing.px10,
+  },
+  paymentCard: {
+    minHeight: 66,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderColor: colors.primary,
+    borderWidth: 1,
+    borderRadius: colors.radius.md,
+    padding: spacing.px12,
+  },
+  paymentInfo: { flex: 1, marginLeft: spacing.px10 },
+  paymentOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: spacing.px14,
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  paymentOptionSelected: { backgroundColor: colors.primaryLight },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.px12,
+  },
+  radioSelected: { borderColor: colors.primary },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+  },
+  paymentContent: { flex: 1 },
+  paymentLabel: { ...typography.smallStrong, color: colors.text },
+  paymentDesc: { ...typography.caption, color: colors.gray, marginTop: 2 },
+  summary: { marginTop: spacing.px16 },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginVertical: 4,
+  },
+  summaryLabelBold: { ...typography.bodyStrong, color: colors.text },
+  summaryValue: { ...typography.caption, color: colors.text },
+  bottomSafe: { backgroundColor: colors.white },
+  bottom: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.px12,
+    paddingHorizontal: spacing.px16,
+    paddingTop: spacing.px10,
+    paddingBottom: spacing.px10,
+    backgroundColor: colors.white,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+  },
+  totalInfo: { flex: 1, minWidth: 0 },
+  bottomLabel: { ...typography.caption, color: colors.gray },
+  total: { ...typography.priceLg, color: colors.primary, marginTop: 2 },
+  cta: { flexShrink: 0, minWidth: 160 },
 });

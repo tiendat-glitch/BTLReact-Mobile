@@ -20,6 +20,7 @@ export type CatalogProduct = {
   deliveryTime: string;
   emoji: string;
   imageUrl: string | null;
+  images: string[];
   sku: string;
   variantName: string;
   description: string;

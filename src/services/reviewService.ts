@@ -26,19 +26,39 @@ export type ReviewPage = {
   limit: number;
 };
 
+const unwrapData = <T,>(payload: T | { data: T }): T => {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return payload.data as T;
+  }
+  return payload as T;
+};
+
 export async function getProductReviews(productId: string): Promise<ReviewPage> {
-  return (await apiGet(`/products/${productId}/reviews`)).data;
+  const { data } = await apiGet<ReviewPage | { data: ReviewPage }>(
+    `/products/${productId}/reviews`,
+  );
+  return unwrapData(data);
 }
 
-export async function getReviewEligibility(productId: string): Promise<EligibleOrderItem[]> {
-  const payload = await apiGet(`/products/${productId}/review-eligibility`);
-  return Array.isArray(payload.data) ? payload.data : [];
+export async function getReviewEligibility(
+  productId: string,
+): Promise<EligibleOrderItem[]> {
+  const { data } = await apiGet<
+    EligibleOrderItem[] | { data: EligibleOrderItem[] }
+  >(
+    `/products/${productId}/review-eligibility`,
+  );
+  const items = unwrapData(data);
+  return Array.isArray(items) ? items : [];
 }
 
 export async function submitReview(
   productId: string,
-  data: { orderItemId: number | string; rating: number; comment: string }
+  data: { orderItemId: number | string; rating: number; comment: string },
 ) {
-  return (await apiPost(`/products/${productId}/reviews`, data)).data;
+  const result = await apiPost<unknown | { data: unknown }>(
+    `/products/${productId}/reviews`,
+    { ...data, productId },
+  );
+  return unwrapData(result.data);
 }
-

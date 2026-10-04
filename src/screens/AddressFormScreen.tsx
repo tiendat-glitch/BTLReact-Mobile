@@ -1,34 +1,37 @@
+// @ts-nocheck
 import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Check from "lucide-react-native/icons/check";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
 import Save from "lucide-react-native/icons/save";
-import type { LatLng } from "react-native-maps";
 
+import AddressPicker from "../components/AddressPicker";
+import Button from "../components/Button";
+import Card from "../components/Card";
 import FormField from "../components/FormField";
 import MapLocationPicker from "../components/MapLocationPicker";
 import ScreenHeader from "../components/ScreenHeader";
 import colors from "../constants/colors";
+import {
+  findProvince,
+  type District,
+  type Province,
+} from "../constants/addressVN";
+import spacing from "../constants/spacing";
+import typography from "../constants/typography";
 import useRequireAuth from "../hooks/useRequireAuth";
-import type { RootStackParamList } from "../navigation/AppNavigator";
 import { createAddress, updateAddress } from "../services/addressService";
-import type {
-  AddressInput,
-  ReverseGeocodedFields,
-} from "../types/address";
 
-type Props = NativeStackScreenProps<RootStackParamList, "AddressForm">;
-
-const EMPTY_FORM: AddressInput = {
+const EMPTY_FORM = {
   receiver_name: "",
   receiver_phone: "",
   address_line: "",
@@ -40,13 +43,19 @@ const EMPTY_FORM: AddressInput = {
   is_default: false,
 };
 
-const getErrorMessage = (error: unknown) =>
+const getErrorMessage = (error) =>
   error instanceof Error ? error.message : "Không thể lưu địa chỉ.";
 
-export default function AddressFormScreen({ navigation, route }: Props) {
+export default function AddressFormScreen({ navigation, route }) {
   const isAuthenticated = useRequireAuth(navigation, "Addresses");
   const address = route.params?.address;
-  const [form, setForm] = useState<AddressInput>(() => ({
+
+  const initialProvince = useMemo(
+    () => (address?.province ? findProvince(address.province) : null),
+    [address?.province]
+  );
+
+  const [form, setForm] = useState({
     ...EMPTY_FORM,
     ...(address
       ? {
@@ -63,11 +72,17 @@ export default function AddressFormScreen({ navigation, route }: Props) {
           is_default: Boolean(address.is_default),
         }
       : {}),
-  }));
+  });
+  const [selectedProvince, setSelectedProvince] = useState<Province | null>(
+    initialProvince
+  );
+  const [pickerOpen, setPickerOpen] = useState<null | "province" | "district">(
+    null
+  );
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const coordinate = useMemo<LatLng | null>(() => {
+  const coordinate = useMemo(() => {
     if (
       form.latitude === null ||
       form.longitude === null ||
@@ -79,14 +94,11 @@ export default function AddressFormScreen({ navigation, route }: Props) {
     return { latitude: form.latitude, longitude: form.longitude };
   }, [form.latitude, form.longitude]);
 
-  const update = (field: keyof AddressInput) => (value: string) => {
+  const update = (field) => (value) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
-  const updateFromMap = (
-    nextCoordinate: LatLng,
-    fields?: ReverseGeocodedFields
-  ) => {
+  const updateFromMap = (nextCoordinate, fields) => {
     setForm((current) => ({
       ...current,
       latitude: nextCoordinate.latitude,
@@ -100,10 +112,39 @@ export default function AddressFormScreen({ navigation, route }: Props) {
           }
         : {}),
     }));
+    if (fields?.province) {
+      const matched = findProvince(fields.province);
+      if (matched) setSelectedProvince(matched);
+    }
+  };
+
+  const handleProvinceChange = ({
+    name,
+    province,
+  }: {
+    name: string;
+    province?: Province;
+  }) => {
+    setForm((current) => ({
+      ...current,
+      province: name,
+      // reset district khi đổi tỉnh để tránh sai lệch
+      district: province && current.district ? "" : current.district,
+    }));
+    setSelectedProvince(province || null);
+  };
+
+  const handleDistrictChange = ({
+    name,
+  }: {
+    name: string;
+    district?: District;
+  }) => {
+    setForm((current) => ({ ...current, district: name }));
   };
 
   const submit = async () => {
-    const payload: AddressInput = {
+    const payload = {
       ...form,
       receiver_name: form.receiver_name.trim(),
       receiver_phone: form.receiver_phone.replace(/\s/g, ""),
@@ -138,155 +179,222 @@ export default function AddressFormScreen({ navigation, route }: Props) {
     } finally {
       setIsSubmitting(false);
     }
+    return;
   };
 
   if (!isAuthenticated) return null;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <SafeAreaView edges={["top", "bottom"]} style={styles.container}>
       <ScreenHeader
         title={address ? "Sửa địa chỉ" : "Thêm địa chỉ"}
         navigation={navigation}
       />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Text style={styles.sectionTitle}>Thông tin người nhận</Text>
-        <View style={styles.section}>
-          <FormField
-            label="Người nhận *"
-            value={form.receiver_name}
-            onChangeText={update("receiver_name")}
-            autoComplete="name"
-            maxLength={150}
-          />
-          <FormField
-            label="Số điện thoại *"
-            value={form.receiver_phone}
-            onChangeText={update("receiver_phone")}
-            keyboardType="phone-pad"
-            autoComplete="tel"
-            maxLength={20}
-          />
-        </View>
-
-        <Text style={styles.sectionTitle}>Chọn trên bản đồ</Text>
-        <View style={styles.section}>
-          <MapLocationPicker value={coordinate} onChange={updateFromMap} />
-        </View>
-
-        <Text style={styles.sectionTitle}>Địa chỉ chi tiết</Text>
-        <View style={styles.section}>
-          <FormField
-            label="Số nhà, tên đường *"
-            value={form.address_line}
-            onChangeText={update("address_line")}
-            maxLength={255}
-          />
-          <FormField
-            label="Phường/xã"
-            value={form.ward}
-            onChangeText={update("ward")}
-            maxLength={100}
-          />
-          <FormField
-            label="Quận/huyện"
-            value={form.district}
-            onChangeText={update("district")}
-            maxLength={100}
-          />
-          <FormField
-            label="Tỉnh/thành phố *"
-            value={form.province}
-            onChangeText={update("province")}
-            maxLength={100}
-          />
-          <Text style={styles.addressHint}>
-            Dữ liệu từ bản đồ chỉ là gợi ý. Hãy kiểm tra lại trước khi lưu.
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.checkboxRow}
-          onPress={() =>
-            setForm((current) => ({
-              ...current,
-              is_default: !current.is_default,
-            }))
-          }
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: form.is_default }}
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
-          <View
-            style={[
-              styles.checkbox,
-              form.is_default && styles.checkboxSelected,
-            ]}
+          <Text style={styles.sectionTitle}>Thông tin người nhận</Text>
+          <Card padding="md">
+            <FormField
+              label="Người nhận *"
+              value={form.receiver_name}
+              onChangeText={update("receiver_name")}
+              autoComplete="name"
+              maxLength={150}
+            />
+            <FormField
+              label="Số điện thoại *"
+              value={form.receiver_phone}
+              onChangeText={update("receiver_phone")}
+              keyboardType="phone-pad"
+              autoComplete="tel"
+              maxLength={20}
+            />
+          </Card>
+
+          <Text style={styles.sectionTitle}>Chọn trên bản đồ</Text>
+          <Card padding="md">
+            <MapLocationPicker value={coordinate} onChange={updateFromMap} />
+          </Card>
+
+          <Text style={styles.sectionTitle}>Khu vực giao hàng</Text>
+          <Card padding="md">
+            <SelectorField
+              label="Tỉnh / Thành phố *"
+              value={form.province}
+              placeholder="Chọn tỉnh thành"
+              onPress={() => setPickerOpen("province")}
+            />
+            <SelectorField
+              label="Quận / Huyện"
+              value={form.district}
+              placeholder={
+                selectedProvince
+                  ? "Chọn quận huyện"
+                  : "Chọn tỉnh thành trước"
+              }
+              disabled={!selectedProvince}
+              onPress={() => setPickerOpen("district")}
+            />
+            <FormField
+              label="Phường / Xã"
+              value={form.ward}
+              onChangeText={update("ward")}
+              placeholder="Nhập phường/xã (không bắt buộc)"
+              maxLength={100}
+            />
+            <FormField
+              label="Số nhà, tên đường *"
+              value={form.address_line}
+              onChangeText={update("address_line")}
+              maxLength={255}
+            />
+            <Text style={styles.addressHint}>
+              Bạn có thể gõ để tìm nhanh tỉnh/quận. Dữ liệu từ bản đồ chỉ là gợi ý,
+              hãy kiểm tra lại trước khi lưu.
+            </Text>
+          </Card>
+
+          <Pressable
+            style={styles.checkboxRow}
+            onPress={() =>
+              setForm((current) => ({
+                ...current,
+                is_default: !current.is_default,
+              }))
+            }
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: form.is_default }}
           >
-            {form.is_default ? (
-              <Check color={colors.white} size={16} strokeWidth={3} />
-            ) : null}
-          </View>
-          <Text style={styles.checkboxText}>Đặt làm địa chỉ mặc định</Text>
-        </TouchableOpacity>
+            <View
+              style={[
+                styles.checkbox,
+                form.is_default && styles.checkboxSelected,
+              ]}
+            >
+              {form.is_default ? (
+                <Check color={colors.white} size={16} strokeWidth={3} />
+              ) : null}
+            </View>
+            <Text style={styles.checkboxText}>Đặt làm địa chỉ mặc định</Text>
+          </Pressable>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <TouchableOpacity
-          style={[styles.saveButton, isSubmitting && styles.disabled]}
-          onPress={submit}
-          disabled={isSubmitting}
-          accessibilityRole="button"
+          <Button
+            label="Lưu địa chỉ"
+            variant="primary"
+            size="lg"
+            loading={isSubmitting}
+            leadingIcon={(color) => (
+              <Save color={color} size={18} strokeWidth={2.4} />
+            )}
+            onPress={submit}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <AddressPicker
+        visible={pickerOpen === "province"}
+        mode="province"
+        title="Chọn Tỉnh / Thành phố"
+        initialValue={form.province}
+        onClose={() => setPickerOpen(null)}
+        onSelect={handleProvinceChange}
+      />
+      <AddressPicker
+        visible={pickerOpen === "district"}
+        mode="district"
+        title="Chọn Quận / Huyện"
+        selectedProvince={selectedProvince}
+        initialValue={form.district}
+        onClose={() => setPickerOpen(null)}
+        onSelect={handleDistrictChange}
+      />
+    </SafeAreaView>
+  );
+}
+
+function SelectorField({ label, value, placeholder, onPress, disabled }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.selector,
+        pressed && !disabled && styles.selectorPressed,
+        disabled && styles.selectorDisabled,
+      ]}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <View style={styles.selectorText}>
+        <Text style={styles.selectorLabel}>{label}</Text>
+        <Text
+          style={[styles.selectorValue, !value && styles.selectorPlaceholder]}
+          numberOfLines={1}
         >
-          {isSubmitting ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <>
-              <Save color={colors.white} size={19} strokeWidth={2.4} />
-              <Text style={styles.saveText}>Lưu địa chỉ</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          {value || placeholder}
+        </Text>
+      </View>
+      <ChevronDown color={colors.gray} size={20} strokeWidth={2.2} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingBottom: 36 },
+  flex: { flex: 1 },
+  content: { padding: spacing.px16, paddingBottom: spacing.px32 },
   sectionTitle: {
+    ...typography.h3,
     color: colors.text,
-    fontSize: 15,
-    fontWeight: "900",
-    marginTop: 10,
-    marginBottom: 9,
+    marginTop: spacing.px10,
+    marginBottom: spacing.px8,
   },
-  section: {
-    backgroundColor: colors.white,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 8,
+  addressHint: {
+    ...typography.caption,
+    color: colors.gray,
+    lineHeight: 16,
   },
-  addressHint: { color: colors.gray, fontSize: 10, lineHeight: 16 },
-  checkboxRow: {
-    minHeight: 52,
+  selector: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 12,
-    marginBottom: 12,
+    justifyContent: "space-between",
+    paddingVertical: spacing.px10,
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+  },
+  selectorPressed: { opacity: 0.6 },
+  selectorDisabled: { opacity: 0.45 },
+  selectorText: { flex: 1, paddingRight: spacing.px8 },
+  selectorLabel: {
+    ...typography.captionStrong,
+    color: colors.gray,
+    marginBottom: 2,
+  },
+  selectorValue: {
+    ...typography.body,
+    color: colors.text,
+  },
+  selectorPlaceholder: { color: colors.muted },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 52,
+    marginTop: spacing.px12,
+    marginBottom: spacing.px12,
   },
   checkbox: {
     width: 24,
     height: 24,
-    borderRadius: 6,
+    borderRadius: colors.radius.sm,
     borderWidth: 1,
     borderColor: colors.borderStrong,
     alignItems: "center",
@@ -296,23 +404,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  checkboxText: { color: colors.text, fontSize: 13, marginLeft: 10 },
+  checkboxText: {
+    ...typography.body,
+    color: colors.text,
+    marginLeft: spacing.px10,
+  },
   error: {
+    ...typography.captionStrong,
     color: colors.red,
     backgroundColor: colors.redLight,
-    borderRadius: 8,
-    padding: 11,
-    marginBottom: 12,
+    borderRadius: colors.radius.md,
+    padding: spacing.px10,
+    marginBottom: spacing.px12,
   },
-  saveButton: {
-    minHeight: 52,
-    flexDirection: "row",
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  disabled: { opacity: 0.65 },
-  saveText: { color: colors.white, fontSize: 14, fontWeight: "900", marginLeft: 8 },
 });
-

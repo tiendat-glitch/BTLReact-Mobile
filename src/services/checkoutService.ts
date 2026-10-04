@@ -31,6 +31,32 @@ export type ShippingMethod = {
   free_shipping_threshold: number | string | null;
 };
 
+export type PaymentMethodCode = "COD" | "BANK_TRANSFER" | "MOMO" | "VNPAY";
+
+export type VoucherValidation =
+  | {
+      valid: true;
+      voucher: {
+        id: number;
+        code: string;
+        name: string;
+        description: string | null;
+        discountType: "PERCENT" | "FIXED";
+        discountValue: number;
+        discountPreview: number;
+        minOrder: number;
+        maxDiscount: number | null;
+        usageLimit: number | null;
+        usedCount: number;
+        remaining: number | null;
+      };
+    }
+  | {
+      valid: false;
+      error: string;
+      minOrder?: number;
+    };
+
 export type CheckoutInput = {
   fulfillmentMethod: FulfillmentMethod;
   addressId?: number | string;
@@ -41,7 +67,7 @@ export type CheckoutInput = {
   specialRequests: SpecialRequestCode[];
   voucherCode?: string;
   note?: string;
-  paymentMethod: "COD";
+  paymentMethod: PaymentMethodCode;
 };
 
 export type CheckoutQuote = {
@@ -55,28 +81,54 @@ export type CheckoutQuote = {
   pickupStore: Store | null;
 };
 
-export async function getCheckoutOptions(): Promise<{
+export type CheckoutOptions = {
   stores: Store[];
   shippingMethods: ShippingMethod[];
   specialRequests: SpecialRequestCode[];
-}> {
-  return (await apiGet("/checkout/options")).data;
+};
+
+const unwrapResponse = <T,>(body: T | { data: T }): T => {
+  if (body && typeof body === "object" && "data" in body) {
+    return body.data as T;
+  }
+  return body as T;
+};
+
+export async function getCheckoutOptions(): Promise<CheckoutOptions> {
+  const { data } = await apiGet<CheckoutOptions | { data: CheckoutOptions }>(
+    "/checkout/options",
+  );
+  return unwrapResponse(data);
 }
 
-export async function getCheckoutQuote(input: CheckoutInput): Promise<CheckoutQuote> {
-  return (await apiPost("/checkout/quote", input)).data;
+export async function validateVoucher(
+  code: string,
+  subtotal: number,
+): Promise<VoucherValidation> {
+  const { data } = await apiPost<
+    VoucherValidation | { data: VoucherValidation }
+  >("/vouchers/validate", { code, subtotal });
+  return unwrapResponse(data);
+}
+
+export async function getCheckoutQuote(
+  input: CheckoutInput,
+): Promise<CheckoutQuote> {
+  const { data } = await apiPost<CheckoutQuote | { data: CheckoutQuote }>(
+    "/checkout/quote",
+    input,
+  );
+  return unwrapResponse(data);
 }
 
 export async function createCheckoutOrder(
   input: CheckoutInput,
-  idempotencyKey: string
+  idempotencyKey: string,
 ) {
-  return (
-    await apiPost(
-      "/orders",
-      { ...input, idempotencyKey },
-      { headers: { "Idempotency-Key": idempotencyKey } }
-    )
-  ).data;
+  const { data } = await apiPost<unknown | { data: unknown }>(
+    "/orders",
+    { ...input, idempotencyKey },
+    { headers: { "Idempotency-Key": idempotencyKey } },
+  );
+  return unwrapResponse(data);
 }
-

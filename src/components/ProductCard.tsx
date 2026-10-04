@@ -1,30 +1,53 @@
+// ProductCard — card sản phẩm dùng trong grid Home/Catalog. Redesign:
+//   - Ảnh lớn, có nền gradient nhẹ để placeholder dễ nhìn.
+//   - Badge giảm giá "nổi" góc trái trên, nút compare góc phải.
+//   - Giá đậm + size lớn, giá gạch ngang dưới.
+//   - Nút "Add" tròn pill, CTA rõ.
+//   - Rating + sold text phụ.
+//   - Khi hết hàng: overlay mờ + nhãn Hết hàng.
 import React, { useEffect, useState } from "react";
 import {
   Image,
+  Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   type GestureResponderEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import GitCompareArrows from "lucide-react-native/icons/git-compare-arrows";
 import ShoppingCart from "lucide-react-native/icons/shopping-cart";
+import Star from "lucide-react-native/icons/star";
+import PackageX from "lucide-react-native/icons/package-x";
 
 import colors from "../constants/colors";
+import shadows from "../constants/shadows";
+import spacing from "../constants/spacing";
+import typography from "../constants/typography";
 import type { CatalogProduct } from "../types/catalog";
 
 type Props = {
   product: CatalogProduct;
   onPress: () => void;
   onAdd?: () => unknown | Promise<unknown>;
+  onCompare?: () => unknown | Promise<unknown>;
+  inCompare?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
 const formatSold = (value: number) =>
   value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value);
 
-export default function ProductCard({ product, onPress, onAdd, style }: Props) {
+export default function ProductCard({
+  product,
+  onPress,
+  onAdd,
+  onCompare,
+  inCompare = false,
+  style,
+}: Props) {
+  const [imageIndex, setImageIndex] = useState(0);
   const [imageFailed, setImageFailed] = useState(false);
   const hasDiscount = product.oldPrice > product.price && product.oldPrice > 0;
   const discount = hasDiscount
@@ -32,7 +55,15 @@ export default function ProductCard({ product, onPress, onAdd, style }: Props) {
     : 0;
   const isOutOfStock = product.stockQuantity <= 0;
 
+  const imageList =
+    product.images && product.images.length > 0
+      ? product.images
+      : product.imageUrl
+        ? [product.imageUrl]
+        : [];
+
   useEffect(() => {
+    setImageIndex(0);
     setImageFailed(false);
   }, [product.imageUrl]);
 
@@ -41,158 +72,328 @@ export default function ProductCard({ product, onPress, onAdd, style }: Props) {
     void onAdd?.();
   };
 
+  const handleCompare = (event: GestureResponderEvent) => {
+    event.stopPropagation();
+    void onCompare?.();
+  };
+
+  const currentImage = imageList[Math.min(imageIndex, imageList.length - 1)];
+
   return (
-    <TouchableOpacity
-      style={[styles.card, style]}
+    <View style={[styles.cardWrap, style]}>
+    <Pressable
+      style={styles.card}
       onPress={onPress}
-      activeOpacity={0.86}
-      accessibilityRole="button"
+      accessibilityRole="link"
       accessibilityLabel={`${product.name}, ${product.price.toLocaleString("vi-VN")} đồng`}
     >
       <View style={styles.imageContainer}>
-        {product.imageUrl && !imageFailed ? (
+        {currentImage && !imageFailed ? (
           <Image
-            source={{ uri: product.imageUrl }}
+            source={{ uri: currentImage }}
             style={styles.image}
-            resizeMode="contain"
+            resizeMode="cover"
             onError={() => setImageFailed(true)}
             accessibilityLabel={`Ảnh ${product.name}`}
           />
         ) : (
-          <Text style={styles.emoji}>{product.emoji}</Text>
+          <View style={styles.placeholder}>
+            <Text style={styles.emoji}>{product.emoji || "🛒"}</Text>
+          </View>
         )}
+
+        {isOutOfStock ? (
+          <View style={styles.outOverlay} pointerEvents="none">
+            <View style={styles.outChip}>
+              <PackageX color={colors.danger} size={14} strokeWidth={2.4} />
+              <Text style={styles.outChipText}>Hết hàng</Text>
+            </View>
+          </View>
+        ) : null}
 
         {hasDiscount ? (
           <View style={styles.discount}>
             <Text style={styles.discountText}>-{discount}%</Text>
           </View>
         ) : null}
+
+        {onCompare ? (
+          <Pressable
+            style={[
+              styles.compareButton,
+              inCompare && styles.compareButtonActive,
+            ]}
+            onPress={handleCompare}
+            accessibilityRole="button"
+            accessibilityLabel={
+              inCompare
+                ? `Bỏ ${product.name} khỏi so sánh`
+                : `Thêm ${product.name} vào so sánh`
+            }
+            accessibilityState={{ selected: inCompare }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <GitCompareArrows
+              color={inCompare ? colors.white : colors.text}
+              size={15}
+              strokeWidth={2.4}
+            />
+          </Pressable>
+        ) : null}
+
+        {imageList.length > 1 ? (
+          <View style={styles.galleryDots}>
+            {imageList.slice(0, 4).map((uri, index) => (
+              <View
+                key={`${uri}-${index}`}
+                style={[
+                  styles.galleryDot,
+                  index === imageIndex && styles.galleryDotActive,
+                ]}
+              />
+            ))}
+            {imageList.length > 4 ? (
+              <Text style={styles.galleryMore}>+{imageList.length - 4}</Text>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.brand} numberOfLines={1}>{product.brand || product.category}</Text>
-        <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
+        <Text style={styles.brand} numberOfLines={1}>
+          {product.brand || product.category}
+        </Text>
+        <Text style={styles.name} numberOfLines={2}>
+          {product.name}
+        </Text>
 
-        <View style={styles.metaRow}>
-          <Text style={styles.rating}>
-            {product.rating ? `★ ${product.rating}` : "Sản phẩm mới"}
+        {product.rating || product.sold ? (
+          <View style={styles.metaRow}>
+            {product.rating ? (
+              <View style={styles.ratingRow}>
+                <Star color={colors.accent} size={11} fill={colors.accent} />
+                <Text style={styles.rating}>{product.rating.toFixed(1)}</Text>
+              </View>
+            ) : null}
+            {product.sold ? (
+              <Text style={styles.sold}>Đã bán {formatSold(product.sold)}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        <View style={styles.priceRow}>
+          <Text style={styles.price} numberOfLines={1}>
+            {product.price.toLocaleString("vi-VN")}đ
           </Text>
-          {product.sold ? <Text style={styles.sold}>Đã bán {formatSold(product.sold)}</Text> : null}
+          {hasDiscount ? (
+            <Text style={styles.oldPrice} numberOfLines={1}>
+              {product.oldPrice.toLocaleString("vi-VN")}đ
+            </Text>
+          ) : null}
         </View>
 
-        <Text style={styles.price}>{product.price.toLocaleString("vi-VN")}đ</Text>
-        {hasDiscount ? (
-          <Text style={styles.oldPrice}>{product.oldPrice.toLocaleString("vi-VN")}đ</Text>
-        ) : (
-          <View style={styles.oldPricePlaceholder} />
-        )}
-
-        <View style={styles.footer}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.addButton,
+            isOutOfStock && styles.disabledButton,
+            pressed && !isOutOfStock ? styles.pressed : null,
+          ]}
+          onPress={isOutOfStock ? undefined : handleAdd}
+          disabled={isOutOfStock || !onAdd}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isOutOfStock || !onAdd }}
+          accessibilityLabel={`Thêm ${product.name} vào giỏ hàng`}
+        >
+          <ShoppingCart
+            color={isOutOfStock ? colors.gray : colors.white}
+            size={18}
+            strokeWidth={2.4}
+          />
           <Text
-            style={[styles.stock, isOutOfStock && styles.outOfStock]}
+            style={[
+              styles.addLabel,
+              isOutOfStock && styles.addLabelDisabled,
+            ]}
             numberOfLines={1}
           >
-            {product.deliveryTime}
+            {isOutOfStock ? "Hết hàng" : "Thêm vào giỏ"}
           </Text>
-          <TouchableOpacity
-            style={[styles.addButton, isOutOfStock && styles.disabledButton]}
-            onPress={handleAdd}
-            disabled={isOutOfStock || !onAdd}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: isOutOfStock || !onAdd }}
-            accessibilityLabel={`Thêm ${product.name} vào giỏ hàng`}
-          >
-            <ShoppingCart color={colors.white} size={19} strokeWidth={2.4} />
-          </TouchableOpacity>
-        </View>
+        </Pressable>
       </View>
-    </TouchableOpacity>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  cardWrap: {
+    flexBasis: "48.5%",
+    maxWidth: "48.5%",
+    minWidth: 0,
+    marginBottom: spacing.px14,
+  },
   card: {
-    width: "48.5%",
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    marginBottom: 14,
+    flex: 1,
+    minHeight: 360,
+    backgroundColor: colors.surface,
+    borderRadius: colors.radius.lg,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
-    elevation: 1,
+    ...shadows.card,
   },
   imageContainer: {
-    height: 148,
+    height: 152,
     backgroundColor: colors.surfaceMuted,
-    justifyContent: "center",
-    alignItems: "center",
     position: "relative",
   },
   image: { width: "100%", height: "100%" },
-  emoji: { fontSize: 68 },
-  discount: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    backgroundColor: colors.red,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  discountText: { color: colors.white, fontSize: 9, fontWeight: "900" },
-  content: { padding: 11 },
-  brand: {
-    color: colors.primary,
-    fontSize: 9,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  name: {
-    minHeight: 39,
-    color: colors.text,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  metaRow: {
-    minHeight: 18,
-    flexDirection: "row",
+  placeholder: {
+    flex: 1,
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 5,
+    justifyContent: "center",
+    backgroundColor: colors.surfaceMuted,
   },
-  rating: { color: colors.accent, fontSize: 9, fontWeight: "800" },
-  sold: { color: colors.gray, fontSize: 9 },
-  price: { color: colors.primary, fontSize: 16, fontWeight: "900", marginTop: 7 },
-  oldPrice: {
-    height: 15,
-    color: colors.muted,
-    fontSize: 10,
-    textDecorationLine: "line-through",
-    marginTop: 2,
-  },
-  oldPricePlaceholder: { height: 17 },
-  footer: {
-    minHeight: 46,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 7,
-  },
-  stock: { flex: 1, color: colors.green, fontSize: 9, fontWeight: "700", paddingRight: 6 },
-  outOfStock: { color: colors.red },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
+  emoji: { fontSize: 56 },
+  outOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.55)",
     alignItems: "center",
     justifyContent: "center",
   },
-  disabledButton: { backgroundColor: colors.muted },
+  outChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: colors.surface,
+    borderRadius: colors.radius.pill,
+    borderWidth: 1,
+    borderColor: colors.dangerLight,
+  },
+  outChipText: {
+    ...typography.micro,
+    color: colors.danger,
+  },
+  discount: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    backgroundColor: colors.accent,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: colors.radius.sm,
+  },
+  discountText: {
+    ...typography.micro,
+    color: colors.white,
+  },
+  galleryDots: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    right: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  galleryDot: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "rgba(15,26,46,0.18)",
+  },
+  galleryDotActive: {
+    backgroundColor: colors.primary,
+  },
+  galleryMore: {
+    ...typography.micro,
+    color: colors.gray,
+    marginLeft: 4,
+  },
+  compareButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: colors.radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  compareButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  content: {
+    padding: spacing.px12,
+    gap: 4,
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  brand: {
+    ...typography.eyebrow,
+    color: colors.primary,
+  },
+  name: {
+    ...typography.bodyStrong,
+    color: colors.text,
+    minHeight: 38,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 2,
+    minHeight: 18,
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  rating: {
+    ...typography.captionStrong,
+    color: colors.accent,
+  },
+  sold: {
+    ...typography.micro,
+    color: colors.gray,
+  },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+    marginTop: 6,
+  },
+  price: {
+    ...typography.priceMd,
+    color: colors.primary,
+  },
+  oldPrice: {
+    ...typography.caption,
+    color: colors.muted,
+    textDecorationLine: "line-through",
+  },
+  addButton: {
+    marginTop: spacing.px10,
+    height: 38,
+    borderRadius: colors.radius.md,
+    backgroundColor: colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  addLabel: {
+    ...typography.buttonSm,
+    color: colors.white,
+  },
+  addLabelDisabled: { color: colors.gray },
+  disabledButton: { backgroundColor: colors.surfaceMuted },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
 });
