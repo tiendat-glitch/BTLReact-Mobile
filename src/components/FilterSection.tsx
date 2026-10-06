@@ -9,18 +9,27 @@ import typography from "../constants/typography";
 type Props = {
   title: string;
   description?: string;
+  selectedCount?: number;
   children: React.ReactNode;
 };
 
 export default function FilterSection({
   title,
   description,
+  selectedCount = 0,
   children,
 }: Props) {
   return (
     <View style={styles.section}>
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{title}</Text>
+          {selectedCount > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{selectedCount}</Text>
+            </View>
+          ) : null}
+        </View>
         {description ? (
           <Text style={styles.description}>{description}</Text>
         ) : null}
@@ -31,10 +40,31 @@ export default function FilterSection({
 }
 
 const styles = StyleSheet.create({
-  section: { marginBottom: spacing.px20 },
-  header: { marginBottom: spacing.px10 },
+  section: {
+    marginBottom: spacing.px20,
+  },
+  header: { marginBottom: spacing.px12 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.px8,
+  },
   title: { ...typography.h4, color: colors.text },
-  description: { ...typography.caption, color: colors.gray, marginTop: 2 },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    borderRadius: colors.radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: {
+    ...typography.micro,
+    color: colors.white,
+    fontWeight: "700",
+  },
+  description: { ...typography.caption, color: colors.gray, marginTop: 4 },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",

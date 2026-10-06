@@ -40,9 +40,27 @@ interface RequestOptions {
   method?: string;
   headers?: Record<string, string>;
   body?: BodyInit | null;
+  /**
+   * Query string params. Sẽ được encode và nối vào path.
+   * `null`/`undefined` sẽ bị bỏ qua; rỗng / `""` cũng bị bỏ qua.
+   */
+  params?: Record<string, string | number | null | undefined>;
   // Allow extra fields for callers (e.g. RN fetch)
   [key: string]: unknown;
 }
+
+const buildPath = (path: string, params?: Record<string, string | number | null | undefined>) => {
+  if (!params) return path;
+  const entries = Object.entries(params).filter(
+    ([, v]) => v !== null && v !== undefined && v !== "",
+  );
+  if (entries.length === 0) return path;
+  const qs = entries
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    .join("&");
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}${qs}`;
+};
 
 async function parseResponse(response: Response): Promise<Json> {
   const text = await response.text();
@@ -64,9 +82,11 @@ async function rawRequest(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
+  const { params, ...rest } = options;
+  const finalPath = buildPath(path, params);
   try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
+    const response = await fetch(`${API_BASE_URL}${finalPath}`, {
+      ...rest,
       headers: {
         Accept: "application/json",
         ...(options.body ? { "Content-Type": "application/json" } : {}),

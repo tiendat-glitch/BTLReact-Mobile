@@ -101,33 +101,38 @@ export default function SpecFilterSheet({
     <BottomSheet
       visible={visible}
       onClose={onClose}
-      title="Bộ lọc thông số"
-      subtitle={
-        activeCount > 0
-          ? `Đang chọn ${activeCount} nhóm tiêu chí`
-          : "Chọn cấu hình phù hợp với bạn"
+      title="Bộ lọc"
+      headerRight={
+        activeCount > 0 ? (
+          <View style={styles.activePill}>
+            <Text style={styles.activePillText}>{activeCount}</Text>
+          </View>
+        ) : null
       }
       footer={
         <View style={styles.footerRow}>
-          <View style={styles.footerLeft}>
-            <Pressable
-              onPress={handleReset}
-              disabled={isFilterEmpty(draft)}
-              accessibilityRole="button"
+          <Pressable
+            onPress={handleReset}
+            disabled={isFilterEmpty(draft)}
+            accessibilityRole="button"
+            accessibilityLabel="Đặt lại bộ lọc"
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.resetBtn,
+              pressed ? styles.resetPressed : null,
+            ]}
+          >
+            <Text
+              style={[
+                styles.resetText,
+                isFilterEmpty(draft) && styles.resetDisabled,
+              ]}
             >
-              <Text
-                style={[
-                  styles.resetText,
-                  isFilterEmpty(draft) && styles.resetDisabled,
-                ]}
-              >
-                Đặt lại
-              </Text>
-            </Pressable>
-          </View>
-          <View style={styles.footerRight}>
-            <Button label="Đóng" variant="ghost" onPress={onClose} />
-            <Button label="Áp dụng" variant="primary" onPress={handleApply} />
+              Đặt lại
+            </Text>
+          </Pressable>
+          <View style={styles.applyWrap}>
+            <Button label="Áp dụng" variant="primary" onPress={handleApply} fullWidth />
           </View>
         </View>
       }
@@ -141,27 +146,39 @@ export default function SpecFilterSheet({
           />
         </FilterSection>
 
-        <FilterSection title="Thương hiệu">
+        <FilterSection
+          title="Thương hiệu"
+          selectedCount={(draft.brand || []).length}
+        >
           {renderGroup(facets?.brand, draft.brand, updateList("brand"))}
         </FilterSection>
 
-        <FilterSection title="CPU">
+        <FilterSection title="CPU" selectedCount={(draft.cpu || []).length}>
           {renderGroup(facets?.cpu, draft.cpu, updateList("cpu"))}
         </FilterSection>
 
-        <FilterSection title="RAM">
+        <FilterSection title="RAM" selectedCount={(draft.ram || []).length}>
           {renderGroup(facets?.ram, draft.ram, updateList("ram"))}
         </FilterSection>
 
-        <FilterSection title="Ổ cứng / SSD">
+        <FilterSection
+          title="Ổ cứng / SSD"
+          selectedCount={(draft.storage || []).length}
+        >
           {renderGroup(facets?.storage, draft.storage, updateList("storage"))}
         </FilterSection>
 
-        <FilterSection title="Card đồ hoạ (GPU)">
+        <FilterSection
+          title="Card đồ hoạ (GPU)"
+          selectedCount={(draft.gpu || []).length}
+        >
           {renderGroup(facets?.gpu, draft.gpu, updateList("gpu"))}
         </FilterSection>
 
-        <FilterSection title="Kích thước màn hình">
+        <FilterSection
+          title="Kích thước màn hình"
+          selectedCount={(draft.screenSize || []).length}
+        >
           {renderGroup(
             facets?.screenSize,
             draft.screenSize,
@@ -169,7 +186,10 @@ export default function SpecFilterSheet({
           )}
         </FilterSection>
 
-        <FilterSection title="Tần số quét">
+        <FilterSection
+          title="Tần số quét"
+          selectedCount={(draft.refreshRate || []).length}
+        >
           {renderGroup(
             facets?.refreshRate,
             draft.refreshRate,
@@ -189,24 +209,34 @@ const styles = StyleSheet.create({
     color: colors.gray,
     paddingVertical: spacing.px8,
   },
+  activePill: {
+    minWidth: 24,
+    height: 24,
+    paddingHorizontal: 8,
+    borderRadius: colors.radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activePillText: {
+    ...typography.captionStrong,
+    color: colors.white,
+  },
   footerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: spacing.px12,
   },
-  footerLeft: { flex: 1 },
-  footerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.px8,
-    flex: 2,
-    justifyContent: "flex-end",
+  resetBtn: {
+    paddingVertical: spacing.px8,
+    paddingHorizontal: spacing.px8,
   },
+  resetPressed: { opacity: 0.6 },
   resetText: {
     ...typography.bodyStrong,
-    color: colors.gray,
+    color: colors.textSubtle,
   },
   resetDisabled: { color: colors.muted },
+  applyWrap: { flex: 1 },
   bottomGap: { height: spacing.px16 },
 });

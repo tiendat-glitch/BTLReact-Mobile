@@ -23,6 +23,7 @@ type Props = {
   onClose: () => void;
   title?: string;
   subtitle?: string;
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxHeightRatio?: number;
@@ -37,6 +38,7 @@ export default function BottomSheet({
   onClose,
   title,
   subtitle,
+  headerRight,
   children,
   footer,
   maxHeightRatio = 0.86,
@@ -92,7 +94,7 @@ export default function BottomSheet({
           ]}
         >
           <View style={styles.handle} />
-          {title || subtitle ? (
+          {title || subtitle || headerRight ? (
             <View style={styles.header}>
               <View style={styles.headerText}>
                 {title ? <Text style={styles.title}>{title}</Text> : null}
@@ -100,6 +102,9 @@ export default function BottomSheet({
                   <Text style={styles.subtitle}>{subtitle}</Text>
                 ) : null}
               </View>
+              {headerRight ? (
+                <View style={styles.headerRight}>{headerRight}</View>
+              ) : null}
               <Pressable
                 style={styles.closeButton}
                 onPress={onClose}
@@ -159,6 +164,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.px16,
   },
   headerText: { flex: 1, paddingRight: spacing.px12 },
+  headerRight: { flexDirection: "row", alignItems: "center", marginRight: spacing.px8 },
   title: { ...typography.h2, color: colors.text },
   subtitle: { ...typography.small, color: colors.gray, marginTop: 4 },
   closeButton: {

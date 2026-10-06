@@ -9,6 +9,12 @@ export type Review = {
   verified_purchase: boolean | number;
 };
 
+export type ReviewBreakdownEntry = {
+  rating: number;
+  count: number;
+  percent: number;
+};
+
 export type EligibleOrderItem = {
   order_item_id: number | string;
   variant_name: string;
@@ -24,6 +30,7 @@ export type ReviewPage = {
   average: number;
   page: number;
   limit: number;
+  breakdown?: ReviewBreakdownEntry[];
 };
 
 const unwrapData = <T,>(payload: T | { data: T }): T => {
@@ -33,9 +40,24 @@ const unwrapData = <T,>(payload: T | { data: T }): T => {
   return payload as T;
 };
 
-export async function getProductReviews(productId: string): Promise<ReviewPage> {
+export type GetReviewsOptions = {
+  page?: number;
+  limit?: number;
+  /** Lọc theo mức rating cụ thể (1..5). Bỏ trống hoặc undefined = tất cả. */
+  rating?: number;
+};
+
+export async function getProductReviews(
+  productId: string,
+  options: GetReviewsOptions = {},
+): Promise<ReviewPage> {
+  const params: Record<string, string> = {};
+  if (options.page) params.page = String(options.page);
+  if (options.limit) params.limit = String(options.limit);
+  if (options.rating) params.rating = String(options.rating);
   const { data } = await apiGet<ReviewPage | { data: ReviewPage }>(
     `/products/${productId}/reviews`,
+    { params },
   );
   return unwrapData(data);
 }

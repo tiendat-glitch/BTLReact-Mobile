@@ -24,6 +24,7 @@ import Card from "../components/Card";
 import ListRow from "../components/ListRow";
 import PriceText from "../components/PriceText";
 import ProductGallery from "../components/ProductGallery";
+import ReviewSummaryInline from "../components/ReviewSummaryInline";
 import StatusBadge from "../components/StatusBadge";
 import colors from "../constants/colors";
 import spacing from "../constants/spacing";
@@ -293,18 +294,16 @@ export default function ProductDetailScreen({ route, navigation }) {
 
           <Text style={styles.name}>{item.name}</Text>
 
-          <View style={styles.ratingRow}>
-            {item.rating ? (
+          {item.rating ? (
+            <View style={styles.ratingRow}>
               <View style={styles.ratingGroup}>
                 <Star color={colors.accent} fill={colors.accent} size={14} strokeWidth={1.6} />
-                <Text style={styles.rating}>{item.rating}</Text>
+                <Text style={styles.rating}>{item.rating.toFixed(1)}</Text>
               </View>
-            ) : (
-              <Text style={styles.rating}>Chưa có đánh giá</Text>
-            )}
-            {item.sold ? <Text style={styles.sold}>Đã bán {item.sold}</Text> : null}
-            <Text style={styles.delivery}>✓ {item.deliveryTime}</Text>
-          </View>
+              {item.sold ? <Text style={styles.sold}>Đã bán {item.sold}</Text> : null}
+              <Text style={styles.delivery}>✓ {item.deliveryTime}</Text>
+            </View>
+          ) : null}
 
           <PriceText price={item.price} oldPrice={item.oldPrice} size="lg" emphasize />
 
@@ -332,23 +331,17 @@ export default function ProductDetailScreen({ route, navigation }) {
             </View>
           </Card>
 
+          <Text style={styles.sectionTitle}>Đánh giá & nhận xét</Text>
+          <ReviewSummaryInline
+            productId={item.id}
+            onViewAll={() => {
+              cacheProduct(item);
+              navigation.navigate("Reviews", { productId: item.id });
+            }}
+          />
+
           <Text style={styles.sectionTitle}>Dịch vụ & so sánh</Text>
           <Card padding="none" radius="lg">
-            <ListRow
-              label="Đánh giá sản phẩm"
-              description={
-                item.rating
-                  ? `${item.rating.toFixed(1)}★ · Xem nhận xét hoặc đánh giá đơn đã mua`
-                  : "Xem nhận xét hoặc đánh giá đơn đã mua"
-              }
-              leadingIcon={Star}
-              leadingTone="warning"
-              onPress={() => {
-                cacheProduct(item);
-                navigation.navigate("Reviews", { productId: item.id });
-              }}
-            />
-            <View style={styles.dividerThin} />
             <ListRow
               label={isCompared(item.id) ? "Đã thêm vào so sánh" : "Thêm vào so sánh"}
               description="So sánh tối đa 4 sản phẩm cùng danh mục"
