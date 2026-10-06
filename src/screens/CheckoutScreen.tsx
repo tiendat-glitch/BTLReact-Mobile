@@ -280,6 +280,23 @@ export default function CheckoutScreen({ navigation, route }) {
     setIsSubmitting(true);
     setError("");
     try {
+      // Re-validate quote trước khi tạo order để tránh lỗi "đặt đơn thất
+      // bại" khi giá/tồn kho/voucher đã thay đổi từ lúc quote. Nếu khớp
+      // thì tiến hành tạo; nếu lệch, hiển thị thông báo và yêu cầu user
+      // đợi reload quote.
+      const freshQuote = await getCheckoutQuote(input);
+      if (
+        freshQuote.subtotal !== quote.subtotal ||
+        freshQuote.shippingFee !== quote.shippingFee ||
+        freshQuote.discountAmount !== quote.discountAmount ||
+        freshQuote.totalAmount !== quote.totalAmount
+      ) {
+        setQuote(freshQuote);
+        setError(
+          "Tổng đơn đã thay đổi (giá/tồn kho/voucher). Hệ thống đã cập nhật, vui lòng kiểm tra và đặt lại.",
+        );
+        return;
+      }
       const order = await createCheckoutOrder(input, idempotencyKey.current);
       await reloadCart();
       idempotencyKey.current = newIdempotencyKey();

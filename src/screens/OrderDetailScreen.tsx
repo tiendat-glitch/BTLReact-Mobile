@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Image,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -11,9 +12,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Check from "lucide-react-native/icons/check";
-import CircleAlert from "lucide-react-native/icons/circle-alert";
 import CircleCheck from "lucide-react-native/icons/circle-check";
 import CircleX from "lucide-react-native/icons/circle-x";
+import Star from "lucide-react-native/icons/star";
 import Truck from "lucide-react-native/icons/truck";
 import X from "lucide-react-native/icons/x";
 
@@ -303,33 +304,63 @@ export default function OrderDetailScreen({ navigation, route }) {
         {/* ===== ITEMS ===== */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sản phẩm</Text>
-          {(order.items || []).map((item) => (
-            <View key={item.id} style={styles.itemRow}>
-              {item.image_url || item.thumbnail_url ? (
-                <Image
-                  source={{ uri: item.image_url || item.thumbnail_url }}
-                  style={styles.itemImage}
-                  resizeMode="cover"
-                  accessibilityLabel={`Ảnh ${item.product_name}`}
-                />
-              ) : (
-                <View style={styles.itemImagePlaceholder}>
-                  <Text style={styles.itemImagePlaceholderText}>📦</Text>
+          {(order.items || []).map((item) => {
+            // Cho phép đánh giá khi đơn đã giao/hoàn tất và item có
+            // product_id (sản phẩm READY_PRODUCT, không phải custom build).
+            const canReview =
+              ["DELIVERED", "COMPLETED"].includes(order.status) &&
+              item.product_id;
+            return (
+              <View key={item.id} style={styles.itemRow}>
+                {item.image_url || item.thumbnail_url || item.product_thumbnail ? (
+                  <Image
+                    source={{ uri: item.image_url || item.thumbnail_url || item.product_thumbnail }}
+                    style={styles.itemImage}
+                    resizeMode="cover"
+                    accessibilityLabel={`Ảnh ${item.product_name}`}
+                  />
+                ) : (
+                  <View style={styles.itemImagePlaceholder}>
+                    <Text style={styles.itemImagePlaceholderText}>📦</Text>
+                  </View>
+                )}
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName} numberOfLines={2}>
+                    {item.product_name}
+                  </Text>
+                  <Text style={styles.muted}>
+                    {item.variant_name} · {item.sku} · x{item.quantity}
+                  </Text>
+                  {canReview ? (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.reviewLink,
+                        pressed ? styles.reviewLinkPressed : null,
+                      ]}
+                      onPress={() =>
+                        navigation.navigate("Reviews", {
+                          productId: item.product_id,
+                        })
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Đánh giá ${item.product_name}`}
+                    >
+                      <Star
+                        color={colors.accent}
+                        size={13}
+                        strokeWidth={2.2}
+                        fill={colors.accent}
+                      />
+                      <Text style={styles.reviewLinkText}>Đánh giá sản phẩm</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
-              )}
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName} numberOfLines={2}>
-                  {item.product_name}
-                </Text>
-                <Text style={styles.muted}>
-                  {item.variant_name} · {item.sku} · x{item.quantity}
+                <Text style={styles.itemPrice}>
+                  {formatCurrency(item.subtotal)}
                 </Text>
               </View>
-              <Text style={styles.itemPrice}>
-                {formatCurrency(item.subtotal)}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* ===== SUMMARY ===== */}
@@ -540,6 +571,23 @@ const styles = StyleSheet.create({
   itemName: {
     ...typography.smallStrong,
     color: colors.text,
+  },
+  reviewLink: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: colors.radius.pill,
+    backgroundColor: colors.warningLight,
+  },
+  reviewLinkPressed: { opacity: 0.75 },
+  reviewLinkText: {
+    ...typography.micro,
+    color: colors.warning,
+    fontWeight: "700",
   },
   itemPrice: {
     ...typography.smallStrong,
