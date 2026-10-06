@@ -188,49 +188,55 @@ export default function WarrantyScreen({ navigation }) {
         />
       </View>
 
-      {/* Filter chips */}
+      {/* Filter chips — thanh danh mục trạng thái bảo hành.
+          Bug: trước đây ScrollView ngang không giới hạn chiều cao (không
+          có maxHeight/height cố định) nên bị stretching full màn, đẩy nội
+          dung warranty xuống dưới. Fix bằng cách bỏ ScrollView ngang không
+          cần thiết và dùng View flex-wrap với gap. */}
       {allItems.length > 0 && !serial.trim() ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterContent}
-        >
-          {STATUS_FILTERS.map((status) => (
-            <Pressable
-              key={status}
-              style={[
-                styles.filterChip,
-                activeFilter === status && styles.filterChipActive,
-              ]}
-              onPress={() => setActiveFilter(status)}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  activeFilter === status && styles.filterChipTextActive,
+        <View style={styles.filterWrap}>
+          {STATUS_FILTERS.map((status) => {
+            const isActive = activeFilter === status;
+            return (
+              <Pressable
+                key={status}
+                style={({ pressed }) => [
+                  styles.filterChip,
+                  isActive && styles.filterChipActive,
+                  pressed ? styles.pressed : null,
                 ]}
-              >
-                {STATUS_LABELS[status]}
-              </Text>
-              <View
-                style={[
-                  styles.filterCount,
-                  activeFilter === status && styles.filterCountActive,
-                ]}
+                onPress={() => setActiveFilter(status)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
+                accessibilityLabel={`${STATUS_LABELS[status]}, ${counts[status]} sản phẩm`}
               >
                 <Text
                   style={[
-                    styles.filterCountText,
-                    activeFilter === status && styles.filterCountTextActive,
+                    styles.filterChipText,
+                    isActive && styles.filterChipTextActive,
                   ]}
                 >
-                  {counts[status]}
+                  {STATUS_LABELS[status]}
                 </Text>
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
+                <View
+                  style={[
+                    styles.filterCount,
+                    isActive && styles.filterCountActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterCountText,
+                      isActive && styles.filterCountTextActive,
+                    ]}
+                  >
+                    {counts[status]}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
       ) : null}
 
       <ScrollView
@@ -356,30 +362,38 @@ export default function WarrantyScreen({ navigation }) {
                 </View>
 
                 {/* Countdown bar */}
-                {isActive ? (
-                  <View style={styles.countdownBar}>
-                    <View
-                      style={[
-                        styles.countdownFill,
-                        {
-                          width: `${Math.max(
-                            0,
-                            Math.min(
-                              100,
-                              (daysLeft / (365 * 2)) * 100,
-                            ),
-                          )}%`,
-                        },
-                        isUrgent && styles.countdownFillUrgent,
-                      ]}
-                    />
-                    {isUrgent ? (
-                      <Text style={styles.countdownUrgentText}>
-                        ⚠️ Bảo hành sắp hết trong {daysLeft} ngày
-                      </Text>
-                    ) : null}
-                  </View>
-                ) : null}
+                {isActive ? (() => {
+                  // Tính % dựa trên tổng số ngày bảo hành thực tế, tránh
+                  // hard-code 365*2 gây sai lệch cho gói bảo hành 12 tháng.
+                  const totalDays = Math.max(
+                    1,
+                    Math.ceil(
+                      (new Date(item.end_date).getTime() -
+                        new Date(item.start_date).getTime()) /
+                        (1000 * 60 * 60 * 24),
+                    ),
+                  );
+                  const fillPercent = Math.max(
+                    0,
+                    Math.min(100, (daysLeft / totalDays) * 100),
+                  );
+                  return (
+                    <View style={styles.countdownBar}>
+                      <View
+                        style={[
+                          styles.countdownFill,
+                          { width: `${fillPercent}%` },
+                          isUrgent && styles.countdownFillUrgent,
+                        ]}
+                      />
+                      {isUrgent ? (
+                        <Text style={styles.countdownUrgentText}>
+                          ⚠️ Bảo hành sắp hết trong {daysLeft} ngày
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                })() : null}
 
                 {/* Serial */}
                 <Text style={styles.serialLabel}>
@@ -417,6 +431,7 @@ export default function WarrantyScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -443,46 +458,46 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     margin: 0,
   },
-  filterScroll: {
+  filterWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: spacing.px16,
     paddingTop: spacing.px12,
     paddingBottom: spacing.px4,
-  },
-  filterContent: {
-    paddingHorizontal: spacing.px16,
     gap: spacing.px8,
-    flexDirection: "row",
+    alignItems: "center",
   },
   filterChip: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: spacing.px12,
     paddingVertical: spacing.px8,
-    borderRadius: 20,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     gap: spacing.px6,
+    minHeight: 36,
   },
   filterChipActive: {
     backgroundColor: colors.primaryLight,
     borderColor: colors.primary,
   },
   filterChipText: {
-    ...typography.caption,
+    ...typography.captionStrong,
     color: colors.gray,
   },
   filterChipTextActive: {
     color: colors.primary,
-    fontWeight: "700",
   },
   filterCount: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: colors.surfaceMuted,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
   },
   filterCountActive: {
     backgroundColor: colors.primary,
@@ -490,7 +505,6 @@ const styles = StyleSheet.create({
   filterCountText: {
     ...typography.micro,
     color: colors.gray,
-    fontWeight: "700",
   },
   filterCountTextActive: {
     color: colors.white,

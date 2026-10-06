@@ -171,9 +171,25 @@ export default function AddressFormScreen({ navigation, route }) {
     setIsSubmitting(true);
     setError("");
     try {
-      if (address) await updateAddress(address.id, payload);
-      else await createAddress(payload);
-      navigation.goBack();
+      let resultId: string | number | undefined;
+      if (address) {
+        const updated = await updateAddress(address.id, payload);
+        resultId = updated?.id ?? address.id;
+      } else {
+        const created = await createAddress(payload);
+        resultId = created?.id;
+      }
+
+      // Quay về màn trước; nếu mở từ Checkout (selectAfterSave=true) thì
+      // truyền kèm id địa chỉ mới để Checkout auto-select luôn — fix bug
+      // "lưu xong không có địa chỉ đặt".
+      if (route.params?.selectAfterSave && resultId != null) {
+        navigation.navigate("Checkout", {
+          selectedAddressId: resultId,
+        });
+      } else {
+        navigation.goBack();
+      }
     } catch (nextError) {
       setError(getErrorMessage(nextError));
     } finally {

@@ -136,12 +136,26 @@ export default function CheckoutScreen({ navigation, route }) {
       setShippingMethods(options.shippingMethods);
       setAvailableSpecialRequests(options.specialRequests);
       setPromotions(promos);
-      setSelectedAddressId((current) =>
-        current ||
-        nextAddresses.find((item) => Boolean(item.is_default))?.id ||
-        nextAddresses[0]?.id ||
-        null,
-      );
+      // Ưu tiên địa chỉ mặc định mỗi lần load lại — fix bug: trước đây
+      // nếu user đã chọn 1 địa chỉ rồi đổi địa chỉ mặc định khác, lần load
+      // sau sẽ giữ địa chỉ cũ do `current || ...` short-circuit. Bây giờ:
+      //  - Nếu địa chỉ hiện tại vẫn tồn tại trong danh sách → giữ nguyên
+      //    (user đã chọn chủ động, không ép đổi).
+      //  - Nếu không còn trong danh sách (bị xóa) hoặc chưa có → lấy
+      //    default, fallback về địa chỉ đầu tiên.
+      setSelectedAddressId((current) => {
+        if (
+          current &&
+          nextAddresses.some((item) => String(item.id) === String(current))
+        ) {
+          return current;
+        }
+        return (
+          nextAddresses.find((item) => Boolean(item.is_default))?.id ||
+          nextAddresses[0]?.id ||
+          null
+        );
+      });
       setPickupStoreId((current) => current || options.stores[0]?.id || null);
       setShippingMethodCode((current) =>
         options.shippingMethods.some((item) => item.code === current)
@@ -317,34 +331,85 @@ export default function CheckoutScreen({ navigation, route }) {
                 <>
                   <Text style={styles.sectionTitle}>Địa chỉ nhận hàng</Text>
                   {selectedAddress ? (
-                    <Pressable
-                      onPress={() =>
-                        navigation.navigate("Addresses", { selectMode: true })
-                      }
-                      style={styles.card}
-                    >
+                    <View style={styles.card}>
                       <View style={styles.rowBetween}>
                         <View style={styles.iconBox}>
                           <MapPin color={colors.primary} size={18} strokeWidth={2.2} />
                         </View>
                         <View style={styles.flex}>
-                          <Text style={styles.strong}>
-                            {selectedAddress.receiver_name} · {selectedAddress.receiver_phone}
-                          </Text>
+                          <View style={styles.addressHeader}>
+                            <Text style={styles.strong} numberOfLines={1}>
+                              {selectedAddress.receiver_name}
+                            </Text>
+                            <Text style={styles.phoneText}>
+                              · {selectedAddress.receiver_phone}
+                            </Text>
+                            {Boolean(selectedAddress.is_default) ? (
+                              <View style={styles.defaultChip}>
+                                <Text style={styles.defaultChipText}>
+                                  Mặc định
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
                           <Text style={styles.muted}>
                             {formatAddress(selectedAddress)}
                           </Text>
                         </View>
-                        <Text style={styles.change}>Đổi</Text>
+                        <Pressable
+                          onPress={() =>
+                            navigation.navigate("Addresses", {
+                              selectMode: true,
+                            })
+                          }
+                          accessibilityRole="button"
+                          accessibilityLabel="Đổi địa chỉ nhận hàng"
+                          hitSlop={8}
+                          style={({ pressed }) => [
+                            styles.changeBtn,
+                            pressed ? styles.changeBtnPressed : null,
+                          ]}
+                        >
+                          <Text style={styles.change}>Đổi</Text>
+                        </Pressable>
                       </View>
-                    </Pressable>
+                    </View>
                   ) : (
-                    <Pressable
-                      style={styles.emptyButton}
-                      onPress={() => navigation.navigate("AddressForm")}
-                    >
-                      <Text style={styles.change}>+ Thêm địa chỉ nhận hàng</Text>
-                    </Pressable>
+                    <View style={styles.emptyAddressBox}>
+                      <Text style={styles.emptyAddressTitle}>
+                        Bạn chưa có địa chỉ nhận hàng
+                      </Text>
+                      <Text style={styles.emptyAddressText}>
+                        Thêm địa chỉ để tiếp tục đặt hàng. Có thể đặt làm địa
+                        chỉ mặc định để lần sau tự điền.
+                      </Text>
+                      <Button
+                        label="Thêm địa chỉ nhận hàng"
+                        variant="primary"
+                        size="md"
+                        leadingIcon={(color) => (
+                          <MapPin color={color} size={18} strokeWidth={2.2} />
+                        )}
+                        onPress={() =>
+                          navigation.navigate("AddressForm", {
+                            // Sau khi lưu, quay lại Checkout để tự động chọn.
+                            selectAfterSave: true,
+                          })
+                        }
+                        style={styles.emptyAddressBtn}
+                      />
+                      <Button
+                        label="Chọn từ sổ địa chỉ"
+                        variant="ghost"
+                        size="md"
+                        onPress={() =>
+                          navigation.navigate("Addresses", {
+                            selectMode: true,
+                          })
+                        }
+                        style={styles.emptyAddressBtn}
+                      />
+                    </View>
                   )}
 
                   <Text style={styles.sectionTitle}>Phương thức vận chuyển</Text>
@@ -782,6 +847,54 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: colors.radius.md,
   },
+  emptyAddressBox: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: colors.radius.lg,
+    padding: spacing.px16,
+    gap: spacing.px10,
+  },
+  emptyAddressTitle: {
+    ...typography.bodyStrong,
+    color: colors.text,
+  },
+  emptyAddressText: {
+    ...typography.caption,
+    color: colors.gray,
+    lineHeight: 18,
+  },
+  emptyAddressBtn: { marginTop: spacing.px4 },
+  addressHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  phoneText: {
+    ...typography.captionStrong,
+    color: colors.text,
+  },
+  defaultChip: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: colors.radius.pill,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    marginLeft: 6,
+  },
+  defaultChipText: {
+    ...typography.micro,
+    color: colors.primary,
+  },
+  changeBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: colors.radius.md,
+    backgroundColor: colors.primaryLight,
+  },
+  changeBtnPressed: { opacity: 0.7 },
   choice: {
     minHeight: 64,
     flexDirection: "row",
