@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -421,19 +422,10 @@ export default function PcBuilderScreen({ navigation }) {
                     }}
                     accessibilityLabel={`Chọn ${item.name}`}
                   >
-                    <View style={styles.optionImageBox}>
-                      {item.imageUrl ? (
-                        <View style={styles.optionImage}>
-                          <Text style={styles.optionImageEmoji}>
-                            {item.emoji || "🔧"}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text style={styles.optionImageEmoji}>
-                          {item.emoji || "🔧"}
-                        </Text>
-                      )}
-                    </View>
+                    <ComponentOptionImage
+                      imageUrl={item.imageUrl}
+                      emoji={item.emoji}
+                    />
                     <Text style={styles.optionName} numberOfLines={2}>
                       {item.name}
                     </Text>
@@ -506,6 +498,32 @@ export default function PcBuilderScreen({ navigation }) {
         </View>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+function ComponentOptionImage({
+  imageUrl,
+  emoji,
+}: {
+  imageUrl?: string | null;
+  emoji?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(imageUrl) && !failed;
+  return (
+    <View style={styles.optionImageBox}>
+      {showImage ? (
+        <Image
+          source={{ uri: imageUrl as string }}
+          style={styles.optionImage}
+          resizeMode="cover"
+          onError={() => setFailed(true)}
+          accessibilityLabel={`Ảnh linh kiện ${emoji || ""}`}
+        />
+      ) : (
+        <Text style={styles.optionImageEmoji}>{emoji || "🔧"}</Text>
+      )}
+    </View>
   );
 }
 
@@ -663,7 +681,11 @@ const styles = StyleSheet.create({
     borderRadius: colors.radius.sm,
     marginBottom: spacing.px8,
   },
-  optionImage: { width: 84, height: 84, alignItems: "center", justifyContent: "center" },
+  optionImage: {
+    width: 84,
+    height: 84,
+    borderRadius: colors.radius.sm,
+  },
   optionImageEmoji: { fontSize: 44 },
   optionName: {
     ...typography.smallStrong,

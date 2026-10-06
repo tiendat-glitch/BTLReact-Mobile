@@ -101,6 +101,16 @@ export default function usePaginatedCatalog(
     }
   }, [isLoading, isLoadingMore, pagination, load]);
 
+  const goToPage = useCallback(
+    (page: number) => {
+      const target = Math.max(1, Math.min(pagination.totalPages || 1, page));
+      if (target === pagination.page) return;
+      if (isLoading || isLoadingMore) return;
+      void load(target, true);
+    },
+    [pagination.page, pagination.totalPages, isLoading, isLoadingMore, load],
+  );
+
   const refresh = useCallback(() => {
     setIsRefreshing(true);
     void load(1, true);
@@ -117,6 +127,7 @@ export default function usePaginatedCatalog(
     error,
     retry: () => load(1, true),
     loadMore,
+    goToPage,
     refresh,
   };
 }

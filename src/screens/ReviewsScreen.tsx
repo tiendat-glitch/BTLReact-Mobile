@@ -143,43 +143,81 @@ export default function ReviewsScreen({ navigation, route }) {
 
         {eligibleItems.length > 0 ? (
           <Card padding="md" style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Viết đánh giá</Text>
-            {eligibleItems.length > 1 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.orderList}>
-                {eligibleItems.map((item) => {
-                  const selected = selectedOrderItemId === item.order_item_id;
-                  return (
-                    <Pressable
-                      key={String(item.order_item_id)}
-                      style={[styles.orderChip, selected && styles.orderChipSelected]}
-                      onPress={() => setSelectedOrderItemId(item.order_item_id)}
-                    >
-                      <Text style={[styles.orderChipText, selected && styles.orderChipTextSelected]}>
-                        {item.order_code}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            ) : null}
-            <View style={styles.stars}>
-              {[1, 2, 3, 4, 5].map((value) => (
-                <Pressable
-                  key={value}
-                  style={styles.starButton}
-                  onPress={() => setRating(value)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${value} sao`}
-                >
-                  <Star
-                    color={colors.accent}
-                    fill={value <= rating ? colors.accent : "transparent"}
-                    size={28}
-                    strokeWidth={1.8}
-                  />
-                </Pressable>
-              ))}
+            <View style={styles.formHeader}>
+              <Text style={styles.formEyebrow}>VIẾT ĐÁNH GIÁ</Text>
+              <Text style={styles.formTitle}>
+                Chia sẻ trải nghiệm của bạn
+              </Text>
+              <Text style={styles.formDescription}>
+                Đánh giá giúp người dùng khác chọn được sản phẩm phù hợp.
+              </Text>
             </View>
+
+            {eligibleItems.length > 1 ? (
+              <>
+                <Text style={styles.fieldLabel}>Đơn hàng của bạn</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.orderList}
+                >
+                  {eligibleItems.map((item) => {
+                    const selected = selectedOrderItemId === item.order_item_id;
+                    return (
+                      <Pressable
+                        key={String(item.order_item_id)}
+                        style={[
+                          styles.orderChip,
+                          selected && styles.orderChipSelected,
+                        ]}
+                        onPress={() => setSelectedOrderItemId(item.order_item_id)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        accessibilityLabel={`Đánh giá cho đơn ${item.order_code}`}
+                      >
+                        <Text
+                          style={[
+                            styles.orderChipText,
+                            selected && styles.orderChipTextSelected,
+                          ]}
+                        >
+                          {item.order_code}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            ) : null}
+
+            <Text style={styles.fieldLabel}>Mức độ hài lòng</Text>
+            <View style={styles.stars}>
+              {[1, 2, 3, 4, 5].map((value) => {
+                const active = value <= rating;
+                return (
+                  <Pressable
+                    key={value}
+                    style={styles.starButton}
+                    onPress={() => setRating(value)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${value} sao`}
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Star
+                      color={active ? colors.accent : colors.borderStrong}
+                      fill={active ? colors.accent : "transparent"}
+                      size={32}
+                      strokeWidth={1.6}
+                    />
+                  </Pressable>
+                );
+              })}
+              <Text style={styles.ratingLabel}>
+                {["Rất tệ", "Tệ", "Tạm ổn", "Tốt", "Tuyệt vời"][rating - 1]}
+              </Text>
+            </View>
+
+            <Text style={styles.fieldLabel}>Nhận xét chi tiết</Text>
             <TextInput
               style={styles.commentInput}
               value={comment}
@@ -187,8 +225,9 @@ export default function ReviewsScreen({ navigation, route }) {
               multiline
               maxLength={2000}
               textAlignVertical="top"
-              placeholder="Chia sẻ trải nghiệm sử dụng sản phẩm..."
+              placeholder="Sản phẩm dùng có ổn không? Ưu/nhược điểm? Có đáng tiền không?"
               placeholderTextColor={colors.muted}
+              accessibilityLabel="Nhận xét chi tiết"
             />
             <Text style={styles.counter}>{comment.length}/2000</Text>
             <Button
@@ -196,11 +235,25 @@ export default function ReviewsScreen({ navigation, route }) {
               variant="primary"
               size="lg"
               loading={isSubmitting}
+              fullWidth
               leadingIcon={(color) => (
                 <Send color={color} size={18} strokeWidth={2.4} />
               )}
               onPress={submit}
+              disabled={!selectedOrderItemId}
             />
+          </Card>
+        ) : isAuthenticated ? (
+          <Card padding="md" style={styles.formSection}>
+            <View style={styles.noForm}>
+              <Text style={styles.noFormTitle}>
+                Chỉ khách đã mua mới có thể đánh giá
+              </Text>
+              <Text style={styles.noFormText}>
+                Mua sản phẩm này để chia sẻ trải nghiệm và giúp người dùng
+                khác chọn đúng sản phẩm.
+              </Text>
+            </View>
           </Card>
         ) : null}
 
@@ -214,9 +267,8 @@ export default function ReviewsScreen({ navigation, route }) {
             variant="empty"
             title="Chưa có đánh giá được duyệt"
             description="Hãy là người đầu tiên chia sẻ trải nghiệm."
-          >
-            <Inbox color={colors.muted} size={20} strokeWidth={1.6} />
-          </FeedbackState>
+            icon={<Inbox color={colors.muted} size={32} strokeWidth={1.6} />}
+          />
         ) : (
           page.items.map((review) => (
             <Card key={String(review.id)} padding="md" style={styles.reviewCard}>
@@ -282,21 +334,37 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   formSection: { marginTop: spacing.px14 },
-  sectionTitle: {
+  formHeader: { marginBottom: spacing.px12 },
+  formEyebrow: {
+    ...typography.eyebrow,
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  formTitle: {
     ...typography.h3,
     color: colors.text,
-    marginTop: spacing.px18,
-    marginBottom: spacing.px10,
   },
-  orderList: { marginBottom: spacing.px8 },
+  formDescription: {
+    ...typography.caption,
+    color: colors.gray,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  fieldLabel: {
+    ...typography.captionStrong,
+    color: colors.textSubtle,
+    marginTop: spacing.px14,
+    marginBottom: spacing.px8,
+  },
+  orderList: { gap: spacing.px8, paddingRight: spacing.px8 },
   orderChip: {
-    minHeight: 38,
+    minHeight: 40,
     justifyContent: "center",
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: colors.radius.md,
-    paddingHorizontal: spacing.px12,
-    marginRight: spacing.px8,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.px14,
   },
   orderChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   orderChipText: {
@@ -304,15 +372,25 @@ const styles = StyleSheet.create({
     color: colors.gray,
   },
   orderChipTextSelected: { color: colors.white },
-  stars: { flexDirection: "row", marginVertical: spacing.px8 },
+  stars: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.px4,
+    marginBottom: spacing.px4,
+  },
   starButton: {
     width: 44,
     height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
+  ratingLabel: {
+    ...typography.captionStrong,
+    color: colors.accent,
+    marginLeft: spacing.px8,
+  },
   commentInput: {
-    minHeight: 110,
+    minHeight: 120,
     color: colors.text,
     backgroundColor: colors.background,
     borderColor: colors.border,
@@ -326,13 +404,27 @@ const styles = StyleSheet.create({
     color: colors.muted,
     textAlign: "right",
     marginTop: spacing.px4,
+    marginBottom: spacing.px12,
+  },
+  noForm: { paddingVertical: spacing.px8 },
+  noFormTitle: {
+    ...typography.bodyStrong,
+    color: colors.text,
+  },
+  noFormText: {
+    ...typography.caption,
+    color: colors.gray,
+    marginTop: 4,
+    lineHeight: 18,
   },
   message: {
     ...typography.captionStrong,
-    color: colors.primary,
-    backgroundColor: colors.primaryLight,
+    color: colors.success,
+    backgroundColor: colors.successLight,
+    borderColor: colors.successSoft,
+    borderWidth: 1,
     borderRadius: colors.radius.md,
-    padding: spacing.px10,
+    padding: spacing.px12,
     marginTop: spacing.px12,
   },
   reviewCard: { marginBottom: spacing.px10 },

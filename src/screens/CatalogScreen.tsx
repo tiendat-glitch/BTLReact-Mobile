@@ -1,4 +1,8 @@
 // CatalogScreen — Hero với search + filter + category rail, grid 2 cột, FAB filter.
+// Redesign:
+//   - Category bar dạng scroll ngang pill, có nhãn "Tất cả" và badge số lượng.
+//   - Sticky filter summary + nút "Xem thêm" cuối grid.
+//   - Thanh phân trang 1, 2, 3... ở dưới cùng, có prev/next + rút gọn.
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,6 +19,7 @@ import X from "lucide-react-native/icons/x";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import FeedbackState from "../components/FeedbackState";
+import Pagination from "../components/Pagination";
 import ProductCard from "../components/ProductCard";
 import SearchBar from "../components/SearchBar";
 import SpecFilterSheet from "../components/SpecFilterSheet";
@@ -97,16 +102,11 @@ export default function CatalogScreen({ navigation, route }: any) {
           onFilter={() => setFilterVisible(true)}
           activeFilterCount={activeFilterCount}
         />
-        <View style={styles.categoryRow}>
-          {categories.map((c: any) => (
-            <CategoryChip
-              key={c.id}
-              label={c.name}
-              selected={category === c.id}
-              onPress={() => setCategory(c.id)}
-            />
-          ))}
-        </View>
+        <CategoryRail
+          categories={categories}
+          selected={category}
+          onSelect={setCategory}
+        />
         <FeedbackState
           variant="loading"
           title="Đang tải catalog..."
@@ -126,8 +126,7 @@ export default function CatalogScreen({ navigation, route }: any) {
         contentContainerStyle={styles.content}
         refreshing={catalog.isRefreshing}
         onRefresh={catalog.refresh}
-        onEndReached={catalog.loadMore}
-        onEndReachedThreshold={0.35}
+        onEndReachedThreshold={0.01}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View style={styles.headerWrap}>
@@ -155,22 +154,10 @@ export default function CatalogScreen({ navigation, route }: any) {
               </View>
             ) : null}
 
-            <FlatList
-              horizontal
-              data={categories}
-              keyExtractor={(item) => item.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryList}
-              renderItem={({ item }: any) => {
-                const selected = category === item.id;
-                return (
-                  <CategoryChip
-                    label={item.name}
-                    selected={selected}
-                    onPress={() => setCategory(item.id)}
-                  />
-                );
-              }}
+            <CategoryRail
+              categories={categories}
+              selected={category}
+              onSelect={setCategory}
             />
 
             {catalog.error ? (
@@ -183,6 +170,20 @@ export default function CatalogScreen({ navigation, route }: any) {
                 </Text>
                 <Text style={styles.retryText}>Chạm để thử lại</Text>
               </Pressable>
+            ) : null}
+
+            {filteredProducts.length > 0 ? (
+              <View style={styles.resultBar}>
+                <Text style={styles.resultText}>
+                  <Text style={styles.resultCount}>
+                    {catalog.pagination.total}
+                  </Text>{" "}
+                  sản phẩm
+                  {catalog.pagination.totalPages > 1
+                    ? ` · Trang ${catalog.pagination.page}/${catalog.pagination.totalPages}`
+                    : ""}
+                </Text>
+              </View>
             ) : null}
           </View>
         }
@@ -201,12 +202,28 @@ export default function CatalogScreen({ navigation, route }: any) {
           />
         )}
         ListFooterComponent={
-          catalog.isLoadingMore ? (
-            <ActivityIndicator
-              style={styles.footerLoader}
-              color={colors.primary}
-            />
-          ) : null
+          <View style={styles.footerWrap}>
+            {catalog.isLoadingMore ? (
+              <ActivityIndicator
+                style={styles.footerLoader}
+                color={colors.primary}
+              />
+            ) : null}
+            {filteredProducts.length > 0 ? (
+              <Pagination
+                page={catalog.pagination.page}
+                totalPages={catalog.pagination.totalPages}
+                onChange={(next) => catalog.goToPage(next)}
+                isLoading={catalog.isLoading || catalog.isLoadingMore}
+                hasNextPage={catalog.pagination.hasNextPage}
+                onLoadMore={catalog.loadMore}
+                remainingHint={Math.max(
+                  0,
+                  catalog.pagination.total - filteredProducts.length,
+                )}
+              />
+            ) : null}
+          </View>
         }
         ListEmptyComponent={
           !catalog.isLoading ? (
@@ -307,35 +324,61 @@ function HeaderHero({
   );
 }
 
-function CategoryChip({
-  label,
+function CategoryRail({
+  categories,
   selected,
-  onPress,
+  onSelect,
 }: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
+  categories: Array<{ id: string; name: string; emoji?: string; slug?: string }>;
+  selected: string;
+  onSelect: (id: string) => void;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      style={({ pressed }) => [
-        styles.categoryChip,
-        selected ? styles.categoryChipSelected : null,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      <Text
-        style={[
-          styles.categoryLabel,
-          selected ? styles.categoryLabelSelected : null,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
+    <View style={styles.categoryWrap}>
+      <FlatList
+        horizontal
+        data={categories}
+        keyExtractor={(item) => item.id}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryList}
+        renderItem={({ item }: any) => {
+          const isSelected = selected === item.id;
+          return (
+            <Pressable
+              onPress={() => onSelect(item.id)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isSelected }}
+              accessibilityLabel={`Danh mục ${item.name}`}
+              style={({ pressed }) => [
+                styles.categoryChip,
+                isSelected ? styles.categoryChipSelected : null,
+                pressed ? styles.pressed : null,
+              ]}
+            >
+              {item.emoji ? (
+                <Text
+                  style={[
+                    styles.categoryEmoji,
+                    isSelected ? styles.categoryEmojiSelected : null,
+                  ]}
+                >
+                  {item.emoji}
+                </Text>
+              ) : null}
+              <Text
+                style={[
+                  styles.categoryLabel,
+                  isSelected ? styles.categoryLabelSelected : null,
+                ]}
+                numberOfLines={1}
+              >
+                {item.name}
+              </Text>
+            </Pressable>
+          );
+        }}
+      />
+    </View>
   );
 }
 
@@ -458,39 +501,42 @@ const styles = StyleSheet.create({
     ...typography.captionStrong,
     color: colors.danger,
   },
-  categoryList: { paddingVertical: spacing.px12, gap: spacing.px8 },
+  categoryWrap: {
+    marginTop: spacing.px12,
+  },
+  categoryList: {
+    paddingVertical: spacing.px4,
+    gap: spacing.px8,
+  },
   categoryChip: {
     minHeight: 40,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: colors.radius.pill,
-    paddingHorizontal: spacing.px16,
+    paddingHorizontal: spacing.px14,
   },
   categoryChipSelected: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
+  categoryEmoji: { fontSize: 16 },
+  categoryEmojiSelected: {},
   categoryLabel: {
     ...typography.captionStrong,
     color: colors.gray,
   },
   categoryLabelSelected: { color: colors.white },
-  categoryRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: spacing.px16,
-    paddingBottom: spacing.px12,
-  },
   errorBox: {
     backgroundColor: colors.dangerLight,
     borderColor: colors.dangerSoft,
     borderWidth: 1,
     borderRadius: colors.radius.md,
     padding: spacing.px12,
-    marginBottom: spacing.px12,
+    marginTop: spacing.px12,
   },
   errorText: {
     ...typography.caption,
@@ -501,6 +547,19 @@ const styles = StyleSheet.create({
     color: colors.primary,
     marginTop: 4,
   },
+  resultBar: {
+    marginTop: spacing.px12,
+    paddingHorizontal: spacing.px4,
+  },
+  resultText: {
+    ...typography.caption,
+    color: colors.gray,
+  },
+  resultCount: {
+    ...typography.captionStrong,
+    color: colors.text,
+  },
   pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
+  footerWrap: { paddingBottom: spacing.px16 },
   footerLoader: { marginVertical: spacing.px18 },
 });

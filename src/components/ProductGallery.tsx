@@ -91,7 +91,7 @@ export default function ProductGallery({
 
   return (
     <View
-      style={[styles.wrapper, { backgroundColor }]}
+      style={[styles.wrapper, { backgroundColor, aspectRatio }]}
       accessibilityLabel={alt}
     >
       <ScrollView

@@ -17,9 +17,11 @@ import Heart from "lucide-react-native/icons/heart";
 import Laptop from "lucide-react-native/icons/laptop";
 import ShoppingCart from "lucide-react-native/icons/shopping-cart";
 import Star from "lucide-react-native/icons/star";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
 
 import Button from "../components/Button";
 import Card from "../components/Card";
+import ListRow from "../components/ListRow";
 import PriceText from "../components/PriceText";
 import ProductGallery from "../components/ProductGallery";
 import StatusBadge from "../components/StatusBadge";
@@ -272,8 +274,7 @@ export default function ProductDetailScreen({ route, navigation }) {
             alt={item.name}
             aspectRatio={1}
             backgroundColor={colors.surfaceMuted}
-          />
-          {hasDiscount ? (
+          />          {hasDiscount ? (
             <View style={styles.discount}>
               <Text style={styles.discountText}>
                 -{Math.round(((item.oldPrice - item.price) / item.oldPrice) * 100)}%
@@ -331,135 +332,108 @@ export default function ProductDetailScreen({ route, navigation }) {
             </View>
           </Card>
 
-          <Button
-            variant="tonal"
-            size="lg"
-            label="Đánh giá sản phẩm"
-            description="Xem nhận xét hoặc đánh giá đơn đã mua"
-            trailingIcon={(color) => (
-              <ChevronLeft
-                color={color}
-                size={18}
-                strokeWidth={2.4}
-                style={{ transform: [{ rotate: "180deg" }] }}
-              />
-            )}
-            onPress={() => {
-              cacheProduct(item);
-              navigation.navigate("Reviews", { productId: item.id });
-            }}
-          />
-
-          {item.category === "Laptop" ? (
-            <Button
-              variant="tonal"
-              size="lg"
-              label="Nâng cấp Laptop"
-              description="Chọn RAM và SSD theo giới hạn phần cứng"
-              leadingIcon={(color) => (
-                <Laptop color={color} size={18} strokeWidth={2.2} />
-              )}
-              trailingIcon={(color) => (
-                <ChevronLeft
-                  color={color}
-                  size={18}
-                  strokeWidth={2.4}
-                  style={{ transform: [{ rotate: "180deg" }] }}
-                />
-              )}
+          <Text style={styles.sectionTitle}>Dịch vụ & so sánh</Text>
+          <Card padding="none" radius="lg">
+            <ListRow
+              label="Đánh giá sản phẩm"
+              description={
+                item.rating
+                  ? `${item.rating.toFixed(1)}★ · Xem nhận xét hoặc đánh giá đơn đã mua`
+                  : "Xem nhận xét hoặc đánh giá đơn đã mua"
+              }
+              leadingIcon={Star}
+              leadingTone="warning"
               onPress={() => {
                 cacheProduct(item);
-                navigation.navigate("LaptopUpgrade", { productId: item.id });
+                navigation.navigate("Reviews", { productId: item.id });
               }}
             />
-          ) : null}
-
-          <Button
-            variant="tonal"
-            size="lg"
-            label={isCompared(item.id) ? "Đã thêm vào so sánh" : "Thêm vào so sánh"}
-            description="So sánh tối đa 4 sản phẩm cùng danh mục"
-            leadingIcon={(color) => (
-              <GitCompareArrows color={color} size={18} strokeWidth={2.2} />
-            )}
-            trailingIcon={(color) => (
-              <ChevronLeft
-                color={color}
-                size={18}
-                strokeWidth={2.4}
-                style={{ transform: [{ rotate: "180deg" }] }}
-              />
-            )}
-            onPress={toggleComparison}
-          />
-
-          {isAuthenticated ? (
-            <Button
-              variant="tonal"
-              size="lg"
-              label={hasPriceAlert ? "Đang theo dõi giá" : "Báo giá khi giảm"}
-              description={
-                hasPriceAlert
-                  ? "Bạn sẽ nhận thông báo khi giá xuống dưới mức đã đặt"
-                  : `Hiện ${item.price.toLocaleString("vi-VN")}đ — đặt mức giá để nhận thông báo`
-              }
-              leadingIcon={(color) => (
-                <Bell color={hasPriceAlert ? colors.primary : color} size={18} strokeWidth={2.2} />
-              )}
-              trailingIcon={
-                hasPriceAlert
-                  ? undefined
-                  : (color) => (
-                      <ChevronLeft
-                        color={color}
-                        size={18}
-                        strokeWidth={2.4}
-                        style={{ transform: [{ rotate: "180deg" }] }}
-                      />
-                    )
-              }
-              onPress={async () => {
-                if (hasPriceAlert) {
-                  Alert.alert(
-                    "Hủy theo dõi giá?",
-                    "Bạn sẽ không nhận thông báo khi giá thay đổi.",
-                    [
-                      { text: "Không", style: "cancel" },
-                      {
-                        text: "Hủy theo dõi",
-                        style: "destructive",
-                        onPress: async () => {
-                          try {
-                            const alerts = await getPriceAlerts();
-                            const alert = alerts.find(
-                              (a) =>
-                                String(a.product_id) === String(item.id) &&
-                                a.alert_type === "PRICE_DROP" &&
-                                a.is_active,
-                            );
-                            if (alert) await deletePriceAlert(alert.id);
-                            setHasPriceAlert(false);
-                          } catch (err) {
-                            Alert.alert("Lỗi", err.message);
-                          }
-                        },
-                      },
-                    ],
-                  );
-                } else {
-                  setPriceAlertTarget(String(item.price));
-                  setShowPriceAlertModal(true);
-                }
-              }}
+            <View style={styles.dividerThin} />
+            <ListRow
+              label={isCompared(item.id) ? "Đã thêm vào so sánh" : "Thêm vào so sánh"}
+              description="So sánh tối đa 4 sản phẩm cùng danh mục"
+              leadingIcon={GitCompareArrows}
+              leadingTone="info"
+              trailing={isCompared(item.id) ? "badge" : "chevron"}
+              badgeLabel={isCompared(item.id) ? "Đã thêm" : undefined}
+              onPress={toggleComparison}
             />
-          ) : null}
+            {item.category === "Laptop" ? (
+              <>
+                <View style={styles.dividerThin} />
+                <ListRow
+                  label="Nâng cấp Laptop"
+                  description="Chọn RAM và SSD theo giới hạn phần cứng"
+                  leadingIcon={Laptop}
+                  leadingTone="primary"
+                  onPress={() => {
+                    cacheProduct(item);
+                    navigation.navigate("LaptopUpgrade", { productId: item.id });
+                  }}
+                />
+              </>
+            ) : null}
+            {isAuthenticated ? (
+              <>
+                <View style={styles.dividerThin} />
+                <ListRow
+                  label={hasPriceAlert ? "Đang theo dõi giá" : "Báo giá khi giảm"}
+                  description={
+                    hasPriceAlert
+                      ? "Bạn sẽ nhận thông báo khi giá xuống dưới mức đã đặt"
+                      : `Hiện ${item.price.toLocaleString("vi-VN")}đ — đặt mức giá để nhận thông báo`
+                  }
+                  leadingIcon={Bell}
+                  leadingTone="success"
+                  trailing={hasPriceAlert ? "badge" : "chevron"}
+                  badgeLabel={hasPriceAlert ? "Đang bật" : undefined}
+                  onPress={async () => {
+                    if (hasPriceAlert) {
+                      Alert.alert(
+                        "Hủy theo dõi giá?",
+                        "Bạn sẽ không nhận thông báo khi giá thay đổi.",
+                        [
+                          { text: "Không", style: "cancel" },
+                          {
+                            text: "Hủy theo dõi",
+                            style: "destructive",
+                            onPress: async () => {
+                              try {
+                                const alerts = await getPriceAlerts();
+                                const alert = alerts.find(
+                                  (a) =>
+                                    String(a.product_id) === String(item.id) &&
+                                    a.alert_type === "PRICE_DROP" &&
+                                    a.is_active,
+                                );
+                                if (alert) await deletePriceAlert(alert.id);
+                                setHasPriceAlert(false);
+                              } catch (err) {
+                                Alert.alert("Lỗi", err.message);
+                              }
+                            },
+                          },
+                        ],
+                      );
+                    } else {
+                      setPriceAlertTarget(String(item.price));
+                      setShowPriceAlertModal(true);
+                    }
+                  }}
+                />
+              </>
+            ) : null}
+          </Card>
 
-          <Card padding="md">
+          <Card padding="md" style={styles.warrantyCard}>
             <View style={styles.warrantyRow}>
+              <View style={styles.warrantyIcon}>
+                <ShieldCheck color={colors.success} size={18} strokeWidth={2.2} />
+              </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.optionTitle}>Chính sách bảo hành</Text>
+                <Text style={styles.optionTitle}>Bảo hành chính hãng</Text>
                 <Text style={styles.optionSub}>
-                  Bảo hành {item.warrantyMonths || 12} tháng
+                  {item.warrantyMonths || 12} tháng tại các trung tâm bảo hành trên toàn quốc
                 </Text>
               </View>
               <View style={[styles.optionCheck, styles.optionCheckSoft]}>
@@ -622,6 +596,7 @@ const styles = StyleSheet.create({
   imageSection: {
     position: "relative",
     backgroundColor: colors.surfaceMuted,
+    width: "100%",
   },
   imageTopBar: {
     position: "absolute",
@@ -740,6 +715,21 @@ const styles = StyleSheet.create({
   warrantyRow: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  warrantyCard: { marginTop: spacing.px12 },
+  warrantyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: colors.radius.md,
+    backgroundColor: colors.successLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.px12,
+  },
+  dividerThin: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.px16,
   },
   quantitySection: { marginTop: spacing.px10 },
   quantityBox: {

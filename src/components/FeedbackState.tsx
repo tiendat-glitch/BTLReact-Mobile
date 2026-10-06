@@ -25,6 +25,7 @@ type Props = {
   retryLabel?: string;
   fullScreen?: boolean;
   icon?: React.ReactNode;
+  children?: React.ReactNode;
 };
 
 const ICON_SIZE = 40;
@@ -38,6 +39,7 @@ export default function FeedbackState({
   retryLabel = "Thử lại",
   fullScreen = false,
   icon,
+  children,
 }: Props) {
   if (variant === "loading") {
     return (
@@ -81,6 +83,7 @@ export default function FeedbackState({
           <Text style={styles.retryText}>{retryLabel}</Text>
         </Pressable>
       ) : null}
+      {children}
     </View>
   );
 }
