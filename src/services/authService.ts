@@ -48,12 +48,23 @@ export async function loginRequest(
 export async function registerRequest(
   input: RegisterInput,
 ): Promise<AuthSession> {
+  // Backend hiện đọc `fullName`/`phone` (camelCase). Mobile cũ gửi
+  // `full_name`/`phone_number` (snake_case) — gửi kèm cả hai để tương
+  // thích. Khi backend chuẩn hoá, có thể bỏ các alias.
+  const payload = {
+    fullName: input.full_name,
+    full_name: input.full_name,
+    phone: input.phone,
+    phone_number: input.phone,
+    email: input.email,
+    password: input.password,
+  };
   const response = await apiPost<AuthSession | { data: AuthSession }>(
     "/auth/register",
-    input,
+    payload,
   );
-  const payload = response.data as AuthSession;
-  const session = (payload as { data?: AuthSession }).data ?? payload;
+  const responseData = response.data as AuthSession;
+  const session = (responseData as { data?: AuthSession }).data ?? responseData;
   if (!session || typeof session !== "object" || !("token" in session)) {
     throw new Error("Phản hồi đăng ký không hợp lệ.");
   }

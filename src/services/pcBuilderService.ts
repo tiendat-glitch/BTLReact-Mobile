@@ -40,17 +40,31 @@ export type BuildValidation = {
   estimatedTotal: number;
 };
 
+const unwrapData = <T,>(payload: T | { data: T } | null | undefined): T => {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in (payload as Record<string, unknown>)
+  ) {
+    return (payload as { data: T }).data;
+  }
+  return payload as T;
+};
+
 export async function getPcBuilderOptions(): Promise<
   Record<ComponentType, PcComponent[]>
 > {
-  const { data } = await apiGet<Record<ComponentType, RawComponent[]>>(
-    "/pc-builder/options",
-  );
+  const { data } = await apiGet<
+    | Record<ComponentType, RawComponent[]>
+    | { data: Record<ComponentType, RawComponent[]> }
+  >("/pc-builder/options");
+  const grouped = unwrapData(data) || ({} as Record<ComponentType, RawComponent[]>);
   const result = {} as Record<ComponentType, PcComponent[]>;
-  Object.entries(data).forEach(([type, rows]) => {
+  Object.entries(grouped).forEach(([type, rows]) => {
+    if (!Array.isArray(rows)) return;
     const products = adaptCatalogRows(rows) as CatalogProduct[];
     result[type as ComponentType] = products.map((product, index) => {
-      const raw = rows[index];
+      const raw = rows[index] as RawComponent;
       return {
         ...product,
         componentType: raw.component_type,
@@ -74,9 +88,9 @@ export async function validatePcBuild(
     productVariantId: product?.variantId,
     quantity: 1,
   }));
-  const { data } = await apiPost<BuildValidation>(
+  const { data } = await apiPost<BuildValidation | { data: BuildValidation }>(
     "/pc-builder/validate",
     { items },
   );
-  return data;
+  return unwrapData(data);
 }

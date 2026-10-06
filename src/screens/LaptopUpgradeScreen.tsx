@@ -29,10 +29,14 @@ import {
   getLaptopUpgradeOptions,
   validateLaptopUpgrade,
 } from "../services/laptopUpgradeService";
+import { getCatalogPage } from "../services/catalogApiService";
+import { getCachedProduct } from "../services/productCache";
 import { formatCurrency } from "../utils/formatters";
 
 export default function LaptopUpgradeScreen({ navigation, route }) {
-  const { product } = route.params;
+  const productId = (route.params as any)?.productId ?? (route.params as any)?.id ?? (route.params as any)?.product?.id;
+  const cachedProduct = productId != null ? getCachedProduct(productId) : null;
+  const [product, setProduct] = useState<any>(cachedProduct ?? (route.params as any)?.product ?? null);
   const { addToCart } = useCart();
   const [profile, setProfile] = useState(null);
   const [options, setOptions] = useState([]);
@@ -42,6 +46,24 @@ export default function LaptopUpgradeScreen({ navigation, route }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+
+  // Nếu điều hướng bằng productId (không có object product), fetch từ catalog.
+  useEffect(() => {
+    if (product || !productId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await getCatalogPage({ page: 1, limit: 20, query: String(productId) });
+        const match = result.items.find((entry) => String(entry.id) === String(productId));
+        if (!cancelled && match) setProduct(match);
+      } catch {
+        // ignore — UI sẽ hiển thị loading
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [productId, product]);
 
   useEffect(() => {
     getLaptopUpgradeOptions(product.id)

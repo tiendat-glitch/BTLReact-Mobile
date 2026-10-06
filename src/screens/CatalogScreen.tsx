@@ -25,6 +25,7 @@ import { useCart } from "../context/CartContext";
 import useCompareAction from "../hooks/useCompareAction";
 import usePaginatedCatalog from "../hooks/usePaginatedCatalog";
 import { getCatalogCategories } from "../services/catalogApiService";
+import { cacheProduct } from "../services/productCache";
 import {
   EMPTY_FILTER,
   countActiveFilterGroups,
@@ -93,7 +94,6 @@ export default function CatalogScreen({ navigation, route }: any) {
         <HeaderHero
           query={query}
           setQuery={setQuery}
-          total={catalog.pagination.total}
           onFilter={() => setFilterVisible(true)}
           activeFilterCount={activeFilterCount}
         />
@@ -134,7 +134,6 @@ export default function CatalogScreen({ navigation, route }: any) {
             <HeaderHero
               query={query}
               setQuery={setQuery}
-              total={catalog.pagination.total}
               onFilter={() => setFilterVisible(true)}
               activeFilterCount={activeFilterCount}
             />
@@ -185,13 +184,6 @@ export default function CatalogScreen({ navigation, route }: any) {
                 <Text style={styles.retryText}>Chạm để thử lại</Text>
               </Pressable>
             ) : null}
-
-            <View style={styles.resultsHeader}>
-              <Text style={styles.resultsLabel} numberOfLines={1}>
-                {filteredProducts.length} / {catalog.pagination.total} sản
-                phẩm
-              </Text>
-            </View>
           </View>
         }
         renderItem={({ item }: any) => (
@@ -200,11 +192,12 @@ export default function CatalogScreen({ navigation, route }: any) {
             onAdd={() => addProduct(item)}
             onCompare={() => compare.toggle(item)}
             inCompare={compare.hasProduct(item.id)}
-            onPress={() =>
+            onPress={() => {
+              cacheProduct(item);
               navigation
                 .getParent()
-                ?.navigate("ProductDetail", { product: item })
-            }
+                ?.navigate("ProductDetail", { productId: item.id });
+            }}
           />
         )}
         ListFooterComponent={
@@ -244,13 +237,11 @@ export default function CatalogScreen({ navigation, route }: any) {
 function HeaderHero({
   query,
   setQuery,
-  total,
   onFilter,
   activeFilterCount,
 }: {
   query: string;
   setQuery: (v: string) => void;
-  total: number;
   onFilter: () => void;
   activeFilterCount: number;
 }) {
@@ -260,11 +251,6 @@ function HeaderHero({
         <View style={styles.heroHeading}>
           <Text style={styles.eyebrow}>CATALOG</Text>
           <Text style={styles.heading}>Tìm đúng thiết bị bạn cần</Text>
-        </View>
-        <View style={styles.countBadge}>
-          <Text style={styles.countText} numberOfLines={1}>
-            {total}
-          </Text>
         </View>
       </View>
 
@@ -384,20 +370,6 @@ const styles = StyleSheet.create({
     ...typography.h2,
     color: colors.text,
     marginTop: 4,
-  },
-  countBadge: {
-    minWidth: 44,
-    height: 32,
-    borderRadius: colors.radius.pill,
-    backgroundColor: colors.primaryLight,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.px12,
-    flexShrink: 0,
-  },
-  countText: {
-    ...typography.bodyStrong,
-    color: colors.primary,
   },
   searchRow: {
     flexDirection: "row",
@@ -528,17 +500,6 @@ const styles = StyleSheet.create({
     ...typography.captionStrong,
     color: colors.primary,
     marginTop: 4,
-  },
-  resultsHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: spacing.px8,
-    marginBottom: spacing.px12,
-  },
-  resultsLabel: {
-    ...typography.captionStrong,
-    color: colors.gray,
   },
   pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
   footerLoader: { marginVertical: spacing.px18 },

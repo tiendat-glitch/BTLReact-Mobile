@@ -39,10 +39,17 @@ import {
   deletePriceAlert,
   getPriceAlerts,
 } from "../services/priceAlertService";
+import { cacheProduct, getCachedProduct } from "../services/productCache";
 
 export default function ProductDetailScreen({ route, navigation }) {
-  const { product } = route.params;
-  const item = product;
+  const productId: string | number | undefined =
+    (route.params as any)?.productId ?? (route.params as any)?.id;
+  // Ưu tiên object product được cache khi user bấm từ Home/Catalog/Favorites,
+  // tránh phải fetch lại và tránh URL phải mang cả object.
+  const cachedItem = productId != null ? getCachedProduct(productId) : null;
+  const [item, setItem] = useState<any>(cachedItem);
+  const [isItemLoading, setIsItemLoading] = useState(!cachedItem && !!productId);
+  const [itemError, setItemError] = useState<string | null>(null);
   const { addToCart } = useCart();
   const { isAuthenticated } = useAuth();
   const {
@@ -93,13 +100,59 @@ export default function ProductDetailScreen({ route, navigation }) {
     };
   }, [isAuthenticated, item?.id]);
 
+  // Nếu mở bằng deep link chỉ có `id` (không có object), fetch từ catalog.
+  useEffect(() => {
+    if (item || !productId) return undefined;
+    let active = true;
+    setIsItemLoading(true);
+    setItemError(null);
+    (async () => {
+      try {
+        const result = await getCatalogPage({
+          page: 1,
+          limit: 20,
+          query: String(productId),
+        });
+        if (!active) return;
+        const match = result.items.find(
+          (entry) => String(entry.id) === String(productId),
+        );
+        if (match) {
+          setItem(match);
+        } else {
+          setItemError("Không tìm thấy sản phẩm.");
+        }
+      } catch (err) {
+        if (active) {
+          setItemError(
+            err instanceof Error ? err.message : "Không tải được sản phẩm.",
+          );
+        }
+      } finally {
+        if (active) setIsItemLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [item, productId]);
+
   if (!item) {
+    if (isItemLoading) {
+      return (
+        <SafeAreaView edges={["top", "bottom"]} style={styles.container}>
+          <View style={styles.errorState}>
+            <Text style={styles.errorTitle}>Đang tải sản phẩm…</Text>
+          </View>
+        </SafeAreaView>
+      );
+    }
     return (
       <SafeAreaView edges={["top", "bottom"]} style={styles.container}>
         <View style={styles.errorState}>
           <Text style={styles.errorTitle}>Không tải được sản phẩm</Text>
           <Text style={styles.errorText}>
-            Vui lòng quay lại và thử chọn sản phẩm khác.
+            {itemError || "Vui lòng quay lại và thử chọn sản phẩm khác."}
           </Text>
           <Button
             label="Quay lại"
@@ -291,7 +344,10 @@ export default function ProductDetailScreen({ route, navigation }) {
                 style={{ transform: [{ rotate: "180deg" }] }}
               />
             )}
-            onPress={() => navigation.navigate("Reviews", { product: item })}
+            onPress={() => {
+              cacheProduct(item);
+              navigation.navigate("Reviews", { productId: item.id });
+            }}
           />
 
           {item.category === "Laptop" ? (
@@ -311,7 +367,10 @@ export default function ProductDetailScreen({ route, navigation }) {
                   style={{ transform: [{ rotate: "180deg" }] }}
                 />
               )}
-              onPress={() => navigation.navigate("LaptopUpgrade", { product: item })}
+              onPress={() => {
+                cacheProduct(item);
+                navigation.navigate("LaptopUpgrade", { productId: item.id });
+              }}
             />
           ) : null}
 
@@ -537,6 +596,7 @@ export default function ProductDetailScreen({ route, navigation }) {
 }
 
 import { formatCurrency } from "../utils/formatters";
+import { getCatalogPage } from "../services/catalogApiService";
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },

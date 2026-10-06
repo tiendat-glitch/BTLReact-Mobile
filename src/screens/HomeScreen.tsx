@@ -44,9 +44,12 @@ import shadows from "../constants/shadows";
 import spacing, { contentInset } from "../constants/spacing";
 import typography from "../constants/typography";
 import { useCart } from "../context/CartContext";
-import useCatalog from "../hooks/useCatalog";
 import useCompareAction from "../hooks/useCompareAction";
+import usePaginatedCatalog from "../hooks/usePaginatedCatalog";
+import { EMPTY_FILTER } from "../types/specFilter";
 import { getPromotions } from "../services/promotionService";
+import { getCatalogCategories } from "../services/catalogApiService";
+import { cacheProduct } from "../services/productCache";
 
 const HOME_CATEGORY_ICONS: Record<string, typeof Sparkles> = {
   all: Sparkles,
@@ -90,22 +93,36 @@ const QUICK_ACCESS = [
 export default function HomeScreen({ navigation }: any) {
   const [query, setQuery] = useState("");
   const [promotions, setPromotions] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
 
+  // Home chỉ cần 1 page để gợi ý; danh sách đầy đủ nằm ở Catalog.
+  // Pagination giúp tránh tải toàn bộ 422 sản phẩm khi mở app.
   const {
     products,
-    categories,
     isLoading,
     isRefreshing,
     error,
     retry,
     refresh,
-  } = useCatalog();
+  } = usePaginatedCatalog("", "all", EMPTY_FILTER);
   const { cartCount, addToCart } = useCart();
   const compare = useCompareAction();
   const featuredProducts = useMemo(
     () => products.slice(0, 8),
     [products],
   );
+
+  useEffect(() => {
+    let active = true;
+    getCatalogCategories()
+      .then((items) => {
+        if (active) setCategories(items);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -144,9 +161,6 @@ export default function HomeScreen({ navigation }: any) {
           <View style={styles.headerText}>
             <Text style={styles.eyebrow} numberOfLines={1}>
               CỬA HÀNG TRỰC TUYẾN
-            </Text>
-            <Text style={styles.brand} numberOfLines={1}>
-              BTL Computer Store
             </Text>
             <Text style={styles.subline} numberOfLines={1}>
               Laptop • PC • Linh kiện chính hãng
@@ -382,9 +396,10 @@ export default function HomeScreen({ navigation }: any) {
                     onAdd={() => handleAddToCart(product.id)}
                     onCompare={() => compare.toggle(product)}
                     inCompare={compare.hasProduct(product.id)}
-                    onPress={() =>
-                      navigation.navigate("ProductDetail", { product })
-                    }
+                    onPress={() => {
+                      cacheProduct(product);
+                      navigation.navigate("ProductDetail", { productId: product.id });
+                    }}
                   />
                 ))}
               </View>

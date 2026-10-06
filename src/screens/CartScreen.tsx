@@ -115,7 +115,7 @@ export default function CartScreen({ navigation }: any) {
                 <Store color={colors.primary} size={20} strokeWidth={2.2} />
               </View>
               <View style={styles.storeInfo}>
-                <Text style={styles.storeName}>BTL Computer Store</Text>
+                <Text style={styles.storeName}>Computer Store</Text>
                 <Text style={styles.storeSub}>
                   Hàng chính hãng • Bảo hành đầy đủ
                 </Text>

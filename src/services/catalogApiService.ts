@@ -11,14 +11,35 @@ export type CatalogPagination = {
   hasNextPage: boolean;
 };
 
+// Unwrap nhiều lớp `data` cho phản hồi backend không đồng nhất.
+// Trả về payload đã bóc vỏ ngoài cùng và pagination tìm được ở bất kỳ
+// cấp nào trong cây.
+function unwrapPayload(input: unknown): {
+  body: unknown;
+  pagination?: CatalogPagination;
+} {
+  let cursor: unknown = input;
+  let pagination: CatalogPagination | undefined;
+  for (let depth = 0; depth < 4 && cursor && typeof cursor === "object"; depth += 1) {
+    const node = cursor as {
+      pagination?: CatalogPagination;
+      data?: unknown;
+    };
+    if (!pagination && node.pagination && typeof node.pagination === "object") {
+      pagination = node.pagination;
+    }
+    if (node.data && typeof node.data === "object") {
+      cursor = node.data;
+      continue;
+    }
+    break;
+  }
+  return { body: cursor, pagination };
+}
+
 export async function getCatalogCategories(): Promise<CatalogCategory[]> {
   const { data } = await apiGet<unknown>("/categories");
-  // `apiGet` đã unwrap 1 lần; `data` là body backend trả, ví dụ
-  // `{ data: [...] }`. Một số phiên bản cũ trả thẳng mảng.
-  let body = data;
-  if (body && typeof body === "object" && "data" in body) {
-    body = (body as { data: unknown }).data;
-  }
+  const { body } = unwrapPayload(data);
   return adaptCategories(Array.isArray(body) ? body : []);
 }
 
@@ -50,7 +71,7 @@ export async function getCatalogPage(params: {
   sort?: string;
   filter?: SpecFilter;
 }): Promise<{ items: CatalogProduct[]; pagination: CatalogPagination }> {
-  const query = [
+  const search = [
     `page=${params.page}`,
     `limit=${params.limit || 20}`,
     `sort=${encodeURIComponent(params.sort || "newest")}`,
@@ -61,39 +82,29 @@ export async function getCatalogPage(params: {
   ]
     .filter(Boolean)
     .join("&");
-  const { data } = await apiGet<unknown>(
-    `/catalog/products?${query}`,
-  );
+  const { data } = await apiGet<unknown>(`/catalog/products?${search}`);
 
-  // `apiGet` đã unwrap 1 lần; `data` là body backend trả. Catalog backend
-  // trả `{ data: [...], pagination: {...} }`; các phiên bản cũ có thể trả
-  // `{ items: [...], pagination: {...} }` hoặc thẳng mảng. Chuẩn hóa.
-  const body = data;
+  const { body, pagination: foundPagination } = unwrapPayload(data);
   let items: unknown[] = [];
-  if (body && typeof body === "object" && "data" in body) {
-    items = (body as { data: unknown }).data as unknown[];
+  if (Array.isArray(body)) {
+    items = body;
+  } else if (body && typeof body === "object") {
+    const obj = body as { items?: unknown[]; data?: unknown };
+    if (Array.isArray(obj.items)) {
+      items = obj.items;
+    } else if (Array.isArray(obj.data as unknown)) {
+      items = obj.data as unknown[];
+    }
   }
-  if (!Array.isArray(items) && body && typeof body === "object" && "items" in body) {
-    items = (body as { items: unknown[] }).items;
-  }
-  if (!Array.isArray(items)) items = [];
+  items = items.filter((entry) => entry && typeof entry === "object");
 
-  const pagination =
-    body && typeof body === "object" && "pagination" in body
-      ? ((body as { pagination: CatalogPagination }).pagination ?? {
-          page: params.page,
-          limit: params.limit || 20,
-          total: items.length,
-          totalPages: 1,
-          hasNextPage: false,
-        })
-      : {
-          page: params.page,
-          limit: params.limit || 20,
-          total: items.length,
-          totalPages: 1,
-          hasNextPage: false,
-        };
+  const pagination: CatalogPagination = foundPagination ?? {
+    page: params.page,
+    limit: params.limit || 20,
+    total: items.length,
+    totalPages: 1,
+    hasNextPage: false,
+  };
 
   return {
     items: adaptCatalogRows(items),
@@ -104,20 +115,19 @@ export async function getCatalogPage(params: {
 export async function getCatalogFacets(params: {
   category?: string;
   query?: string;
-}): Promise<CatalogFacets> {
-  const query = [
+}): Promise<CatalogFacets | null> {
+  const search = [
     params.category ? `category=${encodeURIComponent(params.category)}` : "",
     params.query ? `q=${encodeURIComponent(params.query)}` : "",
   ]
     .filter(Boolean)
     .join("&");
   const { data } = await apiGet<unknown>(
-    `/catalog/facets${query ? `?${query}` : ""}`,
+    `/catalog/facets${search ? `?${search}` : ""}`,
   );
-  // `apiGet` đã unwrap 1 lần; `data` là body backend trả. Nếu backend
-  // tiếp tục wrap `{ data: facets }` thì unwrap tiếp, ngược lại trả thẳng.
-  if (data && typeof data === "object" && "data" in data) {
-    return (data as { data: CatalogFacets }).data ?? null;
+  const { body } = unwrapPayload(data);
+  if (body && typeof body === "object") {
+    return body as CatalogFacets;
   }
-  return (data as CatalogFacets) ?? null;
+  return null;
 }

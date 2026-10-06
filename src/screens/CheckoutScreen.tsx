@@ -269,7 +269,7 @@ export default function CheckoutScreen({ navigation, route }) {
       const order = await createCheckoutOrder(input, idempotencyKey.current);
       await reloadCart();
       idempotencyKey.current = newIdempotencyKey();
-      navigation.replace("OrderDetail", { orderId: order.id, order });
+      navigation.replace("OrderDetail", { orderId: order.id });
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Không thể đặt hàng.");
     } finally {

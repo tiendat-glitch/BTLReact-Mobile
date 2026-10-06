@@ -392,6 +392,8 @@ export default function PcBuilderScreen({ navigation }) {
             <FlatList
               data={activeType ? options[activeType] || [] : []}
               keyExtractor={(item) => item.variantId}
+              numColumns={2}
+              columnWrapperStyle={styles.optionGridRow}
               contentContainerStyle={styles.optionList}
               renderItem={({ item }) => {
                 const specKeys = activeType
@@ -408,7 +410,7 @@ export default function PcBuilderScreen({ navigation }) {
                 const isLowStock = item.stockQuantity <= 3;
                 return (
                   <Pressable
-                    style={styles.optionRow}
+                    style={styles.optionCard}
                     onPress={() => {
                       if (activeType)
                         setSelections((current) => ({
@@ -417,6 +419,7 @@ export default function PcBuilderScreen({ navigation }) {
                         }));
                       setActiveType(null);
                     }}
+                    accessibilityLabel={`Chọn ${item.name}`}
                   >
                     <View style={styles.optionImageBox}>
                       {item.imageUrl ? (
@@ -431,34 +434,25 @@ export default function PcBuilderScreen({ navigation }) {
                         </Text>
                       )}
                     </View>
-                    <View style={styles.optionContent}>
-                      <Text style={styles.optionName} numberOfLines={2}>
-                        {item.name}
+                    <Text style={styles.optionName} numberOfLines={2}>
+                      {item.name}
+                    </Text>
+                    {specs.length > 0 ? (
+                      <Text style={styles.optionSpecInline} numberOfLines={1}>
+                        {specs.join(" · ")}
                       </Text>
-                      <Text style={styles.optionVariant} numberOfLines={1}>
-                        {item.variantName}
-                      </Text>
-                      {specs.length > 0 ? (
-                        <View style={styles.optionSpecs}>
-                          {specs.map((spec) => (
-                            <Text key={spec} style={styles.optionSpec}>
-                              {spec}
-                            </Text>
-                          ))}
-                        </View>
-                      ) : null}
-                      <Text
-                        style={[
-                          styles.optionStock,
-                          isLowStock && styles.optionStockLow,
-                        ]}
-                      >
-                        {isLowStock
-                          ? `Chỉ còn ${item.stockQuantity} sp`
-                          : `Còn ${item.stockQuantity} sp`}
-                      </Text>
-                    </View>
-                    <Text style={styles.price}>
+                    ) : null}
+                    <Text
+                      style={[
+                        styles.optionStockInline,
+                        isLowStock && styles.optionStockLow,
+                      ]}
+                    >
+                      {isLowStock
+                        ? `Chỉ còn ${item.stockQuantity}`
+                        : `Còn ${item.stockQuantity}`}
+                    </Text>
+                    <Text style={styles.price} numberOfLines={1}>
                       {formatCurrency(item.price)}
                     </Text>
                   </Pressable>
@@ -646,46 +640,49 @@ const styles = StyleSheet.create({
   },
   sheetTitle: { ...typography.title, color: colors.text },
   optionList: { padding: spacing.px12 },
-  optionRow: {
-    minHeight: 96,
-    flexDirection: "row",
-    alignItems: "center",
+  optionGridRow: {
+    gap: spacing.px10,
+    marginBottom: spacing.px10,
+  },
+  optionCard: {
+    flex: 1,
+    minHeight: 180,
     backgroundColor: colors.white,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: colors.radius.md,
-    padding: spacing.px12,
-    marginBottom: spacing.px8,
-    gap: spacing.px10,
+    padding: spacing.px10,
+    alignItems: "center",
   },
   optionImageBox: {
-    width: 56,
-    height: 56,
+    width: 84,
+    height: 84,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceMuted,
     borderRadius: colors.radius.sm,
+    marginBottom: spacing.px8,
   },
-  optionImage: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
-  optionImageEmoji: { fontSize: 32 },
-  optionContent: { flex: 1, paddingRight: spacing.px6 },
-  optionName: { ...typography.smallStrong, color: colors.text, lineHeight: 17 },
-  optionVariant: { ...typography.caption, color: colors.gray, marginTop: 2 },
-  optionSpecs: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.px6,
-    marginTop: 4,
+  optionImage: { width: 84, height: 84, alignItems: "center", justifyContent: "center" },
+  optionImageEmoji: { fontSize: 44 },
+  optionName: {
+    ...typography.smallStrong,
+    color: colors.text,
+    lineHeight: 17,
+    textAlign: "center",
   },
-  optionSpec: {
+  optionSpecInline: {
     ...typography.micro,
-    color: colors.primary,
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    color: colors.gray,
+    marginTop: 4,
+    textAlign: "center",
   },
-  optionStock: { ...typography.micro, color: colors.green, marginTop: 4 },
+  optionStockInline: {
+    ...typography.micro,
+    color: colors.green,
+    marginTop: 2,
+    textAlign: "center",
+  },
   optionStockLow: { color: colors.red, fontWeight: "700" },
   saveOverlay: {
     flex: 1,

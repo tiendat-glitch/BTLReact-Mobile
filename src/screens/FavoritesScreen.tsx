@@ -16,6 +16,7 @@ import { useCart } from "../context/CartContext";
 import useRequireAuth from "../hooks/useRequireAuth";
 import useCompareAction from "../hooks/useCompareAction";
 import { getFavorites, removeFavorite } from "../services/favoriteService";
+import { cacheProduct } from "../services/productCache";
 
 export default function FavoritesScreen({ navigation }) {
   const isAuthenticated = useRequireAuth(navigation, "Favorites");
@@ -105,7 +106,10 @@ export default function FavoritesScreen({ navigation }) {
                 <ProductCard
                   product={product}
                   style={styles.fullCard}
-                  onPress={() => navigation.navigate("ProductDetail", { product })}
+                  onPress={() => {
+                    cacheProduct(product);
+                    navigation.navigate("ProductDetail", { productId: product.id });
+                  }}
                   onAdd={() => addToCart(product)}
                   onCompare={() => compare.toggle(product)}
                   inCompare={compare.hasProduct(product.id)}

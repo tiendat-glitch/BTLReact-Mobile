@@ -21,6 +21,17 @@ import { useAuth } from "./AuthContext";
 
 export type LocalCartItem = CartItem;
 
+// Cho phép truyền vào addToCart cả sản phẩm từ catalog (chưa có cartItemId,
+// cartKey…) lẫn cart item lấy từ server.
+type CartInputProduct = Partial<LocalCartItem> &
+  Pick<LocalCartItem, "variantId"> & {
+    name?: string;
+    price?: number;
+    stockQuantity?: number;
+    imageUrl?: string | null;
+    emoji?: string;
+  };
+
 type CartContextValue = {
   cart: LocalCartItem[];
   cartCount: number;
@@ -28,7 +39,7 @@ type CartContextValue = {
   isCartLoading: boolean;
   cartError: unknown;
   addToCart: (
-    product: LocalCartItem,
+    product: CartInputProduct,
     quantity?: number,
     configured?: AddCartItemInput | null,
   ) => Promise<boolean | undefined>;
@@ -92,13 +103,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         let mergeError: unknown = null;
         for (const item of guestItems) {
           try {
-            // Khi merge từ guest cart lên server: mỗi item là CartItem
-            // đã được server xác nhận trước đó (qua serverConfiguration).
-            // Mặc định merge với raw body null vì cấu hình đã có sẵn.
+            // Khi merge từ guest cart lên server: bảo toàn configuration cho
+            // LAPTOP_UPGRADE để RAM/SSD option không bị mất.
+            const isUpgrade = item.itemType === "LAPTOP_UPGRADE";
+            const configured: AddCartItemInput | null = isUpgrade
+              ? {
+                  product_variant_id: Number(item.variantId),
+                  quantity: item.quantity,
+                  item_type: "LAPTOP_UPGRADE",
+                  configuration_key: item.cartKey.includes(":")
+                    ? item.cartKey.split(":")[1] || ""
+                    : "",
+                  configuration_json: item.configuration,
+                }
+              : {
+                  product_variant_id: Number(item.variantId),
+                  quantity: item.quantity,
+                };
             await addServerCartItem(
               item.variantId,
               item.quantity,
-              null,
+              configured,
             );
           } catch (error) {
             mergeError = error;
@@ -125,7 +150,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addToCart = useCallback(
     async (
-      product: LocalCartItem,
+      product: CartInputProduct,
       quantity = 1,
       configured: AddCartItemInput | null = null,
     ): Promise<boolean | undefined> => {
@@ -159,14 +184,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
               : item,
           );
         }
-        return [
-          ...current,
-          {
-            ...product,
-            cartKey,
-            quantity: safeQuantity,
-          },
-        ];
+        // Tạo cart item mới với default đầy đủ để thỏa CartItem shape
+        const newItem: LocalCartItem = {
+          id: String(product.id ?? product.variantId ?? ""),
+          cartItemId: "",
+          cartKey,
+          variantId: String(product.variantId),
+          name: product.name ?? "",
+          variantName: product.variantName ?? "",
+          sku: product.sku ?? "",
+          price: Number(product.price ?? 0),
+          oldPrice: Number(product.oldPrice ?? product.price ?? 0),
+          quantity: safeQuantity,
+          stockQuantity: Number(product.stockQuantity ?? 0),
+          warrantyMonths: Number(product.warrantyMonths ?? 12),
+          imageUrl: product.imageUrl ?? null,
+          emoji: product.emoji ?? "🛒",
+          isAvailable: true,
+          itemType: "PRODUCT",
+          configuration: null,
+          serverConfiguration: null,
+        };
+        return [...current, newItem];
       });
       return true;
     },

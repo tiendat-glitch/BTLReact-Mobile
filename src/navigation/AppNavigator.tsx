@@ -1,6 +1,7 @@
 import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import {
+  LinkingOptions,
   NavigationContainer,
   type NavigatorScreenParams,
   type Theme,
@@ -36,7 +37,6 @@ import ComparisonScreen from "../screens/ComparisonScreen";
 import PcBuilderScreen from "../screens/PcBuilderScreen";
 import LaptopUpgradeScreen from "../screens/LaptopUpgradeScreen";
 import PriceAlertsScreen from "../screens/PriceAlertsScreen";
-import type { CatalogProduct } from "../types/catalog";
 import type { Address } from "../types/address";
 
 export type MainTabParamList = {
@@ -48,22 +48,65 @@ export type MainTabParamList = {
 
 export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
-  ProductDetail: { product: CatalogProduct };
+  ProductDetail: { productId: number | string };
   Checkout: { selectedAddressId?: number | string } | undefined;
   Login: { redirectTo?: keyof RootStackParamList } | undefined;
   Register: { redirectTo?: keyof RootStackParamList } | undefined;
   Addresses: { selectMode?: boolean } | undefined;
   AddressForm: { address?: Address } | undefined;
   Orders: undefined;
-  OrderDetail: { orderId: number | string; order?: unknown };
+  OrderDetail: { orderId: number | string };
   Notifications: undefined;
   Warranty: undefined;
   Favorites: undefined;
-  Reviews: { product: CatalogProduct };
+  Reviews: { productId: number | string };
   Comparison: undefined;
   PcBuilder: undefined;
-  LaptopUpgrade: { product: CatalogProduct };
+  LaptopUpgrade: { productId: number | string };
   PriceAlerts: undefined;
+};
+
+// Deep link config: cho phép mở product/order/warranty từ URL
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ["btlcomputestore://", "https://btlcomputerstore.app/"],
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          Home: "home",
+          Catalog: "catalog",
+          Cart: "cart",
+          Profile: "profile",
+        },
+      },
+      ProductDetail: {
+        path: "product/:productId",
+        parse: {
+          productId: (id: string | undefined) => id ?? undefined,
+        },
+        stringify: {
+          productId: (params: any) =>
+            params?.productId != null
+              ? String(params.productId)
+              : params?.id != null
+                ? String(params.id)
+                : "",
+        },
+      },
+      Orders: "orders",
+      OrderDetail: "orders/:orderId",
+      Notifications: "notifications",
+      Warranty: "warranty",
+      Favorites: "favorites",
+      Reviews: "product/:productId/reviews",
+      Comparison: "comparison",
+      PcBuilder: "pc-builder",
+      PriceAlerts: "price-alerts",
+      Addresses: "addresses",
+      Login: "login",
+      Register: "register",
+    },
+  },
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -152,7 +195,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer theme={navigationTheme} linking={linking}>
       <Stack.Navigator initialRouteName="Main" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />

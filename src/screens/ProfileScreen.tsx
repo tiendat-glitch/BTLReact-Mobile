@@ -285,7 +285,7 @@ export default function ProfileScreen({ navigation }: any) {
         </Pressable>
 
         <Text style={styles.versionText}>
-          BTL Computer Store · Phiên bản 1.0.0
+          Phiên bản 1.0.0
         </Text>
         <View style={{ height: 40 }} />
       </ScrollView>

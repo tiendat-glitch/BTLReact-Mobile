@@ -29,6 +29,8 @@ import {
   getReviewEligibility,
   submitReview,
 } from "../services/reviewService";
+import { getCatalogPage } from "../services/catalogApiService";
+import { getCachedProduct } from "../services/productCache";
 import { formatDateTime } from "../utils/formatters";
 
 const EMPTY_PAGE = {
@@ -40,7 +42,9 @@ const EMPTY_PAGE = {
 };
 
 export default function ReviewsScreen({ navigation, route }) {
-  const { product } = route.params;
+  const productId = (route.params as any)?.productId ?? (route.params as any)?.id ?? (route.params as any)?.product?.id;
+  const cachedProduct = productId != null ? getCachedProduct(productId) : null;
+  const [product, setProduct] = useState<any>(cachedProduct ?? (route.params as any)?.product ?? null);
   const { isAuthenticated } = useAuth();
   const [page, setPage] = useState(EMPTY_PAGE);
   const [eligibleItems, setEligibleItems] = useState([]);
@@ -50,6 +54,24 @@ export default function ReviewsScreen({ navigation, route }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+
+  // Nếu điều hướng bằng productId (không có object product), fetch từ catalog.
+  useEffect(() => {
+    if (product || !productId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await getCatalogPage({ page: 1, limit: 20, query: String(productId) });
+        const match = result.items.find((entry) => String(entry.id) === String(productId));
+        if (!cancelled && match) setProduct(match);
+      } catch {
+        // ignore — UI sẽ hiển thị khi product null
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [productId, product]);
 
   const load = useCallback(async () => {
     setIsLoading(true);

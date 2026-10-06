@@ -80,7 +80,7 @@ export default function LoginScreen({ navigation, route }: any) {
             <View style={styles.logoBadge}>
               <LogIn color={colors.white} size={26} strokeWidth={2.4} />
             </View>
-            <Text style={styles.eyebrow}>BTL COMPUTER STORE</Text>
+            <Text style={styles.eyebrow}>COMPUTER STORE</Text>
             <Text style={styles.title}>Chào mừng trở lại</Text>
             <Text style={styles.subtitle}>
               Đăng nhập để theo dõi đơn, quản lý địa chỉ và bảo hành.
@@ -169,7 +169,7 @@ export default function LoginScreen({ navigation, route }: any) {
           <View style={styles.legalRow}>
             <Text style={styles.legalText}>
               Bằng việc tiếp tục, bạn đồng ý với Điều khoản & Chính sách bảo mật
-              của BTL Computer Store.
+              của cửa hàng.
             </Text>
           </View>
         </ScrollView>
