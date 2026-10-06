@@ -1,6 +1,19 @@
+// SpecFilterSheet — bộ lọc catalog dạng bottom sheet.
+// Pattern tham khảo Shopee/Lazada/Tiki:
+//   - Section chip ngắn (brand): wrap 2 cột tự nhiên.
+//   - Section chip dài (CPU/RAM/SSD/GPU/screen/refreshRate): scroll ngang.
+//   - Nút "Đặt lại" là icon ở header thay vì footer (tiết kiệm 56pt).
+//   - Footer chỉ giữ "Áp dụng" fullWidth — CTA chính.
 // @ts-nocheck
 import React, { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 
 import BottomSheet from "./BottomSheet";
 import Button from "./Button";
@@ -23,6 +36,7 @@ type Props = {
   initial: SpecFilter;
   onClose: () => void;
   onApply: (next: SpecFilter) => void;
+  maxHeightRatio?: number;
 };
 
 const toggleValue = (list: string[] | undefined, value: string): string[] => {
@@ -36,7 +50,7 @@ const toggleValue = (list: string[] | undefined, value: string): string[] => {
 const renderGroup = (
   group: FacetGroup | undefined,
   selected: string[] | undefined,
-  onToggle: (value: string) => void
+  onToggle: (value: string) => void,
 ) => {
   if (!group || group.entries.length === 0) {
     return (
@@ -59,12 +73,17 @@ const renderGroup = (
   });
 };
 
+// Helper: facet group có dữ liệu để hiển thị hay không.
+const hasGroup = (group: FacetGroup | undefined): boolean =>
+  !!group && group.entries.length > 0;
+
 export default function SpecFilterSheet({
   visible,
   facets,
   initial,
   onClose,
   onApply,
+  maxHeightRatio,
 }: Props) {
   const [draft, setDraft] = useState<SpecFilter>(initial);
 
@@ -75,6 +94,7 @@ export default function SpecFilterSheet({
   }, [visible, initial]);
 
   const activeCount = countActiveFilterGroups(draft);
+  const canReset = !isFilterEmpty(draft);
 
   const updateList = (key: keyof SpecFilter) => (value: string) => {
     setDraft((current) => ({
@@ -92,53 +112,60 @@ export default function SpecFilterSheet({
   };
 
   const handleReset = () => setDraft(EMPTY_FILTER);
-
-  const handleApply = () => {
-    onApply(draft);
-  };
+  const handleApply = () => onApply(draft);
 
   return (
     <BottomSheet
       visible={visible}
       onClose={onClose}
       title="Bộ lọc"
+      maxHeightRatio={maxHeightRatio}
       headerRight={
-        activeCount > 0 ? (
-          <View style={styles.activePill}>
-            <Text style={styles.activePillText}>{activeCount}</Text>
-          </View>
-        ) : null
-      }
-      footer={
-        <View style={styles.footerRow}>
+        <View style={styles.headerRight}>
           <Pressable
             onPress={handleReset}
-            disabled={isFilterEmpty(draft)}
+            disabled={!canReset}
             accessibilityRole="button"
-            accessibilityLabel="Đặt lại bộ lọc"
-            hitSlop={8}
+            accessibilityLabel={
+              activeCount > 0
+                ? `Đặt lại bộ lọc (${activeCount} đang chọn)`
+                : "Đặt lại bộ lọc"
+            }
+            hitSlop={6}
             style={({ pressed }) => [
-              styles.resetBtn,
-              pressed ? styles.resetPressed : null,
+              styles.resetIcon,
+              !canReset && styles.resetIconDisabled,
+              pressed && canReset ? styles.resetPressed : null,
             ]}
           >
-            <Text
-              style={[
-                styles.resetText,
-                isFilterEmpty(draft) && styles.resetDisabled,
-              ]}
-            >
-              Đặt lại
-            </Text>
+            <RotateCcw
+              color={canReset ? colors.textSubtle : colors.muted}
+              size={16}
+              strokeWidth={2}
+            />
+            {activeCount > 0 ? (
+              <View style={styles.resetDot}>
+                <Text style={styles.resetDotText}>{activeCount}</Text>
+              </View>
+            ) : null}
           </Pressable>
-          <View style={styles.applyWrap}>
-            <Button label="Áp dụng" variant="primary" onPress={handleApply} fullWidth />
-          </View>
         </View>
       }
+      footer={
+        <Button
+          label={activeCount > 0 ? `Áp dụng (${activeCount})` : "Áp dụng"}
+          variant="primary"
+          size="sm"
+          onPress={handleApply}
+          fullWidth
+        />
+      }
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <FilterSection title="Khoảng giá" description="Đơn vị: VNĐ">
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <FilterSection title="Khoảng giá">
           <PriceRangeInput
             minValue={draft.priceMin}
             maxValue={draft.priceMax}
@@ -146,97 +173,134 @@ export default function SpecFilterSheet({
           />
         </FilterSection>
 
-        <FilterSection
-          title="Thương hiệu"
-          selectedCount={(draft.brand || []).length}
-        >
-          {renderGroup(facets?.brand, draft.brand, updateList("brand"))}
-        </FilterSection>
+        {hasGroup(facets?.brand) || (draft.brand || []).length > 0 ? (
+          <FilterSection
+            title="Thương hiệu"
+            selectedCount={(draft.brand || []).length}
+          >
+            {renderGroup(facets?.brand, draft.brand, updateList("brand"))}
+          </FilterSection>
+        ) : null}
 
-        <FilterSection title="CPU" selectedCount={(draft.cpu || []).length}>
-          {renderGroup(facets?.cpu, draft.cpu, updateList("cpu"))}
-        </FilterSection>
+        {hasGroup(facets?.cpu) || (draft.cpu || []).length > 0 ? (
+          <FilterSection
+            title="CPU"
+            selectedCount={(draft.cpu || []).length}
+            scroll
+          >
+            {renderGroup(facets?.cpu, draft.cpu, updateList("cpu"))}
+          </FilterSection>
+        ) : null}
 
-        <FilterSection title="RAM" selectedCount={(draft.ram || []).length}>
-          {renderGroup(facets?.ram, draft.ram, updateList("ram"))}
-        </FilterSection>
+        {hasGroup(facets?.ram) || (draft.ram || []).length > 0 ? (
+          <FilterSection
+            title="RAM"
+            selectedCount={(draft.ram || []).length}
+            scroll
+          >
+            {renderGroup(facets?.ram, draft.ram, updateList("ram"))}
+          </FilterSection>
+        ) : null}
 
-        <FilterSection
-          title="Ổ cứng / SSD"
-          selectedCount={(draft.storage || []).length}
-        >
-          {renderGroup(facets?.storage, draft.storage, updateList("storage"))}
-        </FilterSection>
+        {hasGroup(facets?.storage) || (draft.storage || []).length > 0 ? (
+          <FilterSection
+            title="Ổ cứng / SSD"
+            selectedCount={(draft.storage || []).length}
+            scroll
+          >
+            {renderGroup(facets?.storage, draft.storage, updateList("storage"))}
+          </FilterSection>
+        ) : null}
 
-        <FilterSection
-          title="Card đồ hoạ (GPU)"
-          selectedCount={(draft.gpu || []).length}
-        >
-          {renderGroup(facets?.gpu, draft.gpu, updateList("gpu"))}
-        </FilterSection>
+        {hasGroup(facets?.gpu) || (draft.gpu || []).length > 0 ? (
+          <FilterSection
+            title="Card đồ hoạ (GPU)"
+            selectedCount={(draft.gpu || []).length}
+            scroll
+          >
+            {renderGroup(facets?.gpu, draft.gpu, updateList("gpu"))}
+          </FilterSection>
+        ) : null}
 
-        <FilterSection
-          title="Kích thước màn hình"
-          selectedCount={(draft.screenSize || []).length}
-        >
-          {renderGroup(
-            facets?.screenSize,
-            draft.screenSize,
-            updateList("screenSize")
-          )}
-        </FilterSection>
+        {hasGroup(facets?.screenSize) || (draft.screenSize || []).length > 0 ? (
+          <FilterSection
+            title="Kích thước màn hình"
+            selectedCount={(draft.screenSize || []).length}
+            scroll
+          >
+            {renderGroup(
+              facets?.screenSize,
+              draft.screenSize,
+              updateList("screenSize"),
+            )}
+          </FilterSection>
+        ) : null}
 
-        <FilterSection
-          title="Tần số quét"
-          selectedCount={(draft.refreshRate || []).length}
-        >
-          {renderGroup(
-            facets?.refreshRate,
-            draft.refreshRate,
-            updateList("refreshRate")
-          )}
-        </FilterSection>
-
-        <View style={styles.bottomGap} />
+        {hasGroup(facets?.refreshRate) ||
+        (draft.refreshRate || []).length > 0 ? (
+          <FilterSection
+            title="Tần số quét"
+            selectedCount={(draft.refreshRate || []).length}
+            scroll
+          >
+            {renderGroup(
+              facets?.refreshRate,
+              draft.refreshRate,
+              updateList("refreshRate"),
+            )}
+          </FilterSection>
+        ) : null}
       </ScrollView>
     </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    paddingBottom: spacing.px8,
+  },
   emptyHint: {
     ...typography.caption,
     color: colors.gray,
-    paddingVertical: spacing.px8,
+    paddingVertical: spacing.px4,
   },
-  activePill: {
-    minWidth: 24,
-    height: 24,
-    paddingHorizontal: 8,
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.px4,
+    marginRight: spacing.px2,
+  },
+  resetIcon: {
+    width: 28,
+    height: 28,
     borderRadius: colors.radius.pill,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  resetDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 14,
+    height: 14,
+    paddingHorizontal: 3,
+    borderRadius: 7,
     backgroundColor: colors.primary,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
-  activePillText: {
-    ...typography.captionStrong,
+  resetDotText: {
+    fontSize: 9,
+    fontWeight: "700",
     color: colors.white,
+    lineHeight: 10,
   },
-  footerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.px12,
+  resetIconDisabled: {
+    opacity: 0.6,
   },
-  resetBtn: {
-    paddingVertical: spacing.px8,
-    paddingHorizontal: spacing.px8,
-  },
-  resetPressed: { opacity: 0.6 },
-  resetText: {
-    ...typography.bodyStrong,
-    color: colors.textSubtle,
-  },
-  resetDisabled: { color: colors.muted },
-  applyWrap: { flex: 1 },
-  bottomGap: { height: spacing.px16 },
+  resetPressed: { opacity: 0.7 },
 });

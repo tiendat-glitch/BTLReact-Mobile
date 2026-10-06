@@ -295,7 +295,6 @@ export default function ReviewsScreen({ navigation, route }) {
                 Đánh giá giúp người dùng khác chọn được sản phẩm phù hợp.
               </Text>
             </View>
-
             {eligibleItems.length > 1 ? (
               <>
                 <Text style={styles.fieldLabel}>Đơn hàng của bạn</Text>
@@ -414,15 +413,49 @@ export default function ReviewsScreen({ navigation, route }) {
                 <Star color={colors.muted} size={22} strokeWidth={1.6} />
               </View>
               <Text style={styles.noFormTitle}>
-                Chỉ khách đã mua mới có thể đánh giá
+                Chưa có đơn hàng đủ điều kiện đánh giá
               </Text>
               <Text style={styles.noFormText}>
-                Mua sản phẩm này để chia sẻ trải nghiệm và giúp người dùng
-                khác chọn đúng sản phẩm.
+                Bạn chỉ có thể đánh giá sau khi đơn hàng ở trạng thái Đã giao / Hoàn tất. Mỗi sản phẩm trong đơn chỉ đánh giá được một lần.
               </Text>
+              <Button
+                label="Xem đơn hàng của tôi"
+                variant="tonal"
+                size="sm"
+                fullWidth={false}
+                onPress={() => navigation.navigate("Orders")}
+                style={styles.noFormButton}
+              />
             </View>
           </Card>
-        ) : null}
+        ) : (
+          <Card padding="md" style={styles.formSection}>
+            <View style={styles.noForm}>
+              <View style={styles.noFormIcon}>
+                <Star color={colors.muted} size={22} strokeWidth={1.6} />
+              </View>
+              <Text style={styles.noFormTitle}>
+                Đăng nhập để viết đánh giá
+              </Text>
+              <Text style={styles.noFormText}>
+                Chỉ khách hàng đã mua sản phẩm mới có thể chia sẻ trải nghiệm.
+              </Text>
+              <Button
+                label="Đăng nhập"
+                variant="primary"
+                size="sm"
+                fullWidth={false}
+                onPress={() =>
+                  navigation.navigate("Login", {
+                    redirectTo: "Reviews",
+                    productId,
+                  })
+                }
+                style={styles.noFormButton}
+              />
+            </View>
+          </Card>
+        )}
 
         {message ? (
           <View
@@ -845,6 +878,13 @@ const styles = StyleSheet.create({
     color: colors.gray,
     textAlign: "center",
     lineHeight: 18,
+  },
+  noFormHighlight: {
+    color: colors.text,
+    fontWeight: "700",
+  },
+  noFormButton: {
+    marginTop: spacing.px8,
   },
 
   // ===== Message =====

@@ -1,4 +1,5 @@
-// @ts-nocheck
+// FilterChip — chip compact theo pattern Shopee/Lazada cho filter sheet.
+// Tối ưu cho màn hình nhỏ: minHeight 28, padding 8/4, count badge 14pt.
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Check from "lucide-react-native/icons/check";
@@ -24,10 +25,11 @@ export default function FilterChip({
 }: Props) {
   return (
     <Pressable
-      style={[
+      style={({ pressed }) => [
         styles.chip,
         selected && styles.chipSelected,
         disabled && styles.chipDisabled,
+        pressed && !disabled && styles.chipPressed,
       ]}
       onPress={onPress}
       disabled={disabled}
@@ -36,7 +38,12 @@ export default function FilterChip({
       accessibilityLabel={label}
     >
       {selected ? (
-        <Check color={colors.white} size={14} strokeWidth={3} />
+        <Check
+          color={colors.white}
+          size={11}
+          strokeWidth={3}
+          style={styles.check}
+        />
       ) : null}
       <Text
         style={[
@@ -45,6 +52,7 @@ export default function FilterChip({
           disabled && styles.labelDisabled,
         ]}
         numberOfLines={1}
+        ellipsizeMode="tail"
       >
         {label}
       </Text>
@@ -60,6 +68,7 @@ export default function FilterChip({
               styles.countText,
               selected && styles.countTextSelected,
             ]}
+            numberOfLines={1}
           >
             {count}
           </Text>
@@ -73,14 +82,16 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: spacing.px12,
-    paddingVertical: spacing.px8,
-    minHeight: 36,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    minHeight: 28,
+    maxWidth: 200,
     borderRadius: colors.radius.pill,
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
     borderWidth: 1,
-    gap: spacing.px6,
+    marginRight: spacing.px6,
+    marginBottom: spacing.px6,
   },
   chipSelected: {
     backgroundColor: colors.primary,
@@ -89,27 +100,34 @@ const styles = StyleSheet.create({
   chipDisabled: {
     opacity: 0.45,
   },
+  chipPressed: {
+    opacity: 0.7,
+  },
+  check: { marginRight: 3 },
   label: {
-    ...typography.captionStrong,
+    fontSize: 12,
+    fontWeight: "600",
     color: colors.text,
+    flexShrink: 1,
   },
   labelSelected: { color: colors.white },
   labelDisabled: { color: colors.muted },
   countBadge: {
-    minWidth: 20,
-    paddingHorizontal: 6,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: colors.white,
+    minWidth: 16,
+    paddingHorizontal: 4,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: spacing.px4,
+    marginLeft: 4,
   },
   countBadgeSelected: {
     backgroundColor: colors.white,
   },
   countText: {
-    ...typography.micro,
+    fontSize: 9,
+    fontWeight: "600",
     color: colors.gray,
   },
   countTextSelected: {

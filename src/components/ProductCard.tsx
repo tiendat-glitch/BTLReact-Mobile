@@ -30,8 +30,8 @@ import type { CatalogProduct } from "../types/catalog";
 type Props = {
   product: CatalogProduct;
   onPress: () => void;
-  onAdd?: () => unknown | Promise<unknown>;
-  onCompare?: () => unknown | Promise<unknown>;
+  onAdd?: (product: CatalogProduct) => unknown | Promise<unknown>;
+  onCompare?: (product: CatalogProduct) => unknown | Promise<unknown>;
   inCompare?: boolean;
   style?: StyleProp<ViewStyle>;
 };
@@ -39,7 +39,7 @@ type Props = {
 const formatSold = (value: number) =>
   value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value);
 
-export default function ProductCard({
+export default React.memo(function ProductCard({
   product,
   onPress,
   onAdd,
@@ -69,12 +69,12 @@ export default function ProductCard({
 
   const handleAdd = (event: GestureResponderEvent) => {
     event.stopPropagation();
-    void onAdd?.();
+    void onAdd?.(product);
   };
 
   const handleCompare = (event: GestureResponderEvent) => {
     event.stopPropagation();
-    void onCompare?.();
+    void onCompare?.(product);
   };
 
   const currentImage = imageList[Math.min(imageIndex, imageList.length - 1)];
@@ -223,7 +223,7 @@ export default function ProductCard({
       </Pressable>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   cardWrap: {

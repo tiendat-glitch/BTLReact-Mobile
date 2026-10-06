@@ -3,7 +3,7 @@
 //   - Category bar dạng scroll ngang pill, có nhãn "Tất cả" và badge số lượng.
 //   - Sticky filter summary + nút "Xem thêm" cuối grid.
 //   - Thanh phân trang 1, 2, 3... ở dưới cùng, có prev/next + rút gọn.
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -84,14 +84,24 @@ export default function CatalogScreen({ navigation, route }: any) {
     }
   }, [route.params?.initialQuery, route.params?.category, categories]);
 
-  const addProduct = async (product: any) => {
-    await addToCart(product as any);
-  };
+  const addProduct = useCallback(
+    async (product: any) => {
+      await addToCart(product as any);
+    },
+    [addToCart],
+  );
 
-  const handleApplyFilter = (next: SpecFilter) => {
+  const handleApplyFilter = useCallback((next: SpecFilter) => {
     setFilter(next);
     setFilterVisible(false);
-  };
+  }, []);
+
+  // Cache danh sách id đang compare để ProductCard không bị re-render khi
+  // collection API đổi (chỉ item có id thuộc set mới thay đổi `inCompare`).
+  const compareIds = useMemo(
+    () => new Set(compare.products.map((p) => p.id)),
+    [compare.products],
+  );
 
   if (catalog.isLoading && filteredProducts.length === 0) {
     return (
@@ -190,9 +200,9 @@ export default function CatalogScreen({ navigation, route }: any) {
         renderItem={({ item }: any) => (
           <ProductCard
             product={item}
-            onAdd={() => addProduct(item)}
-            onCompare={() => compare.toggle(item)}
-            inCompare={compare.hasProduct(item.id)}
+            onAdd={addProduct}
+            onCompare={compare.toggle}
+            inCompare={compareIds.has(item.id)}
             onPress={() => {
               cacheProduct(item);
               navigation
@@ -246,6 +256,7 @@ export default function CatalogScreen({ navigation, route }: any) {
         initial={filter}
         onClose={() => setFilterVisible(false)}
         onApply={handleApplyFilter}
+        maxHeightRatio={0.78}
       />
     </SafeAreaView>
   );

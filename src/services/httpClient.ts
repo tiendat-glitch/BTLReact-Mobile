@@ -65,13 +65,26 @@ const buildPath = (path: string, params?: Record<string, string | number | null 
 async function parseResponse(response: Response): Promise<Json> {
   const text = await response.text();
   if (!text) return null;
+  // Nếu response trả HTML (ví dụ 404 mặc định của Express "Cannot GET/POST/PATCH..."),
+  // parseResponse không nên ném lỗi JSON. Để nguyên text cho caller
+  // xử lý ở tầng status check. Khi payload thực sự không phải JSON
+  // (server crash trả về text rác), vẫn ném lỗi như cũ.
+  if (response.status >= 200 && response.status < 300) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new ApiError("Máy chủ trả về dữ liệu không hợp lệ.", {
+        code: "INVALID_RESPONSE",
+        status: response.status,
+      });
+    }
+  }
+  // Lỗi: thử parse JSON trước; nếu không phải (HTML 404), trả object
+  // giả với message lấy từ <pre> tag hoặc text thuần.
   try {
     return JSON.parse(text);
   } catch {
-    throw new ApiError("Máy chủ trả về dữ liệu không hợp lệ.", {
-      code: "INVALID_RESPONSE",
-      status: response.status,
-    });
+    return { message: text.trim().slice(0, 200) };
   }
 }
 
