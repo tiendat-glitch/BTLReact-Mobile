@@ -109,15 +109,19 @@ export default function ReviewsScreen({ navigation, route }) {
   }, [productId, product]);
 
   const load = useCallback(async () => {
+    const currentProductId = product?.id;
+    if (currentProductId == null) {
+      return;
+    }
     setIsLoading(true);
     setMessage("");
     try {
-      const reviews = await getProductReviews(product.id, {
+      const reviews = await getProductReviews(String(currentProductId), {
         rating: filterRating ?? undefined,
       });
       setPage(reviews);
       if (isAuthenticated) {
-        const eligible = await getReviewEligibility(product.id);
+        const eligible = await getReviewEligibility(String(currentProductId));
         setEligibleItems(eligible);
         setSelectedOrderItemId(
           (current) => current || eligible[0]?.order_item_id || null,
@@ -130,32 +134,34 @@ export default function ReviewsScreen({ navigation, route }) {
         error instanceof Error ? error.message : "Không tải được đánh giá.",
       );
     } finally {
-      setIsLoading(false);
+      if (product?.id != null) setIsLoading(false);
     }
-  }, [isAuthenticated, product.id, filterRating]);
+  }, [isAuthenticated, product?.id, filterRating]);
 
   useEffect(() => {
-    void load();
+    if (product?.id != null) {
+      void load();
+    }
   }, [load]);
 
   const submit = async () => {
-    if (!selectedOrderItemId) return;
+    if (product?.id == null || !selectedOrderItemId) return;
     setIsSubmitting(true);
     setMessage("");
     try {
-      await submitReview(product.id, {
+      await submitReview(String(product.id), {
         orderItemId: selectedOrderItemId,
         rating,
         comment: comment.trim(),
       });
       setComment("");
       setRating(5);
-      setMessage("Đánh giá đã được gửi và đang chờ duyệt.");
-      const eligible = await getReviewEligibility(product.id);
+      setMessage("Đánh giá đã được gửi và hiển thị ngay.");
+      const eligible = await getReviewEligibility(String(product.id));
       setEligibleItems(eligible);
       setSelectedOrderItemId(eligible[0]?.order_item_id || null);
       // Reload lại list để user thấy breakdown cập nhật.
-      const reviews = await getProductReviews(product.id, {
+      const reviews = await getProductReviews(String(product.id), {
         rating: filterRating ?? undefined,
       });
       setPage(reviews);
@@ -592,9 +598,7 @@ function ReviewItem({ review, productThumb, productName }) {
         </View>
         <View style={{ flex: 1 }}>
           <View style={styles.reviewerRow}>
-            <Text style={styles.reviewer} numberOfLines={1}>
-              {name}
-            </Text>
+            <Text style={styles.reviewer}>{name}</Text>
             {verified ? (
               <View style={styles.verified}>
                 <BadgeCheck
@@ -992,19 +996,21 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   reviewerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.px8,
+    flexDirection: "column",
+    alignItems: "flex-start",
+    minWidth: 0,
   },
   reviewer: {
     ...typography.bodyStrong,
     color: colors.text,
     flexShrink: 1,
+    alignSelf: "stretch",
   },
   verified: {
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
+    marginTop: spacing.px4,
     paddingHorizontal: 6,
     paddingVertical: 2,
     backgroundColor: colors.successLight,

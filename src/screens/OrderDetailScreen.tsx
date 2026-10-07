@@ -28,6 +28,7 @@ import typography from "../constants/typography";
 import useRequireAuth from "../hooks/useRequireAuth";
 import { cancelOrder, getOrder } from "../services/orderService";
 import { formatCurrency, formatDateTime } from "../utils/formatters";
+import { resolveImageUrl } from "../utils/imageUrl";
 import { STATUS_LABELS } from "./OrdersScreen";
 
 // Timeline flow thành công (PENDING -> COMPLETED).
@@ -67,6 +68,8 @@ const ORDER_STATUS_TONE = {
   CANCELLED: "danger",
   DELIVERY_FAILED: "danger",
 };
+
+const REVIEWABLE_ORDER_STATUSES = new Set(["DELIVERED", "COMPLETED"]);
 
 export default function OrderDetailScreen({ navigation, route }) {
   const isAuthenticated = useRequireAuth(navigation, "Orders");
@@ -308,22 +311,21 @@ export default function OrderDetailScreen({ navigation, route }) {
             // Cho phép đánh giá khi đơn đã giao/hoàn tất và item có
             // product_id (sản phẩm READY_PRODUCT, không phải custom build).
             const canReview =
-              ["DELIVERED", "COMPLETED"].includes(order.status) &&
+              REVIEWABLE_ORDER_STATUSES.has(String(order.status).toUpperCase()) &&
               item.product_id;
+            const itemImageUrls = [
+              item.image_url,
+              item.thumbnail_url,
+              item.product_thumbnail,
+            ]
+              .map(resolveImageUrl)
+              .filter(Boolean);
             return (
               <View key={item.id} style={styles.itemRow}>
-                {item.image_url || item.thumbnail_url || item.product_thumbnail ? (
-                  <Image
-                    source={{ uri: item.image_url || item.thumbnail_url || item.product_thumbnail }}
-                    style={styles.itemImage}
-                    resizeMode="cover"
-                    accessibilityLabel={`Ảnh ${item.product_name}`}
-                  />
-                ) : (
-                  <View style={styles.itemImagePlaceholder}>
-                    <Text style={styles.itemImagePlaceholderText}>📦</Text>
-                  </View>
-                )}
+                <OrderItemImage
+                  imageUrls={itemImageUrls}
+                  label={`Ảnh ${item.product_name}`}
+                />
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemName} numberOfLines={2}>
                     {item.product_name}
@@ -423,6 +425,35 @@ function Summary({ label, value, bold }) {
         {value}
       </Text>
     </View>
+  );
+}
+
+function OrderItemImage({
+  imageUrls,
+  label,
+}: {
+  imageUrls: string[];
+  label: string;
+}) {
+  const [imageIndex, setImageIndex] = useState(0);
+  const imageUrl = imageUrls[imageIndex];
+
+  if (!imageUrl) {
+    return (
+      <View style={styles.itemImagePlaceholder}>
+        <Text style={styles.itemImagePlaceholderText}>📦</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri: imageUrl }}
+      style={styles.itemImage}
+      resizeMode="cover"
+      onError={() => setImageIndex((index) => index + 1)}
+      accessibilityLabel={label}
+    />
   );
 }
 

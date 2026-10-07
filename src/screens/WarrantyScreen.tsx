@@ -395,9 +395,11 @@ export default function WarrantyScreen({ navigation }) {
                   );
                 })() : null}
 
-                {/* Serial */}
                 <Text style={styles.serialLabel}>
-                  Serial: <Text style={styles.serialValue}>{item.serial_number || "Chưa cấp"}</Text>
+                  Serial:{" "}
+                  <Text style={styles.serialValue}>
+                    {item.serial_number || "Chưa cấp"}
+                  </Text>
                 </Text>
 
                 {/* Note */}

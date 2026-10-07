@@ -149,24 +149,40 @@ export default function PriceAlertsScreen({ navigation }) {
           const currentPrice = Number(alert.current_price || 0);
           const targetPrice = Number(alert.target_price || 0);
           const triggered = currentPrice > 0 && currentPrice <= targetPrice;
+          const openProduct = () =>
+            navigation.navigate("ProductDetail", {
+              productId: alert.product_id,
+            });
           return (
             <Card key={alert.id} padding="md" style={styles.card}>
               <View style={styles.cardHeader}>
-                {alert.thumbnail_url ? (
-                  <Image
-                    source={{ uri: alert.thumbnail_url }}
-                    style={styles.thumbnail}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <View style={styles.thumbnailPlaceholder}>
-                    <Text style={styles.thumbnailEmoji}>📦</Text>
-                  </View>
-                )}
+                <Pressable
+                  onPress={openProduct}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Xem ${alert.product_name || "sản phẩm"}`}
+                >
+                  {alert.thumbnail_url ? (
+                    <Image
+                      source={{ uri: alert.thumbnail_url }}
+                      style={styles.thumbnail}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={styles.thumbnailPlaceholder}>
+                      <Text style={styles.thumbnailEmoji}>📦</Text>
+                    </View>
+                  )}
+                </Pressable>
                 <View style={styles.cardInfo}>
-                  <Text style={styles.productName} numberOfLines={2}>
-                    {alert.product_name || "Sản phẩm"}
-                  </Text>
+                  <Pressable
+                    onPress={openProduct}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Xem ${alert.product_name || "sản phẩm"}`}
+                  >
+                    <Text style={styles.productName} numberOfLines={2}>
+                      {alert.product_name || "Sản phẩm"}
+                    </Text>
+                  </Pressable>
                   <View style={styles.metaRow}>
                     <Text style={styles.metaLabel}>Giá hiện tại</Text>
                     <Text style={styles.currentPrice}>

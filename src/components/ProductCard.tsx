@@ -65,7 +65,7 @@ export default React.memo(function ProductCard({
   useEffect(() => {
     setImageIndex(0);
     setImageFailed(false);
-  }, [product.imageUrl]);
+  }, [imageList.join("|")]);
 
   const handleAdd = (event: GestureResponderEvent) => {
     event.stopPropagation();
@@ -93,7 +93,13 @@ export default React.memo(function ProductCard({
             source={{ uri: currentImage }}
             style={styles.image}
             resizeMode="cover"
-            onError={() => setImageFailed(true)}
+            onError={() => {
+              if (imageIndex + 1 < imageList.length) {
+                setImageIndex(imageIndex + 1);
+              } else {
+                setImageFailed(true);
+              }
+            }}
             accessibilityLabel={`Ảnh ${product.name}`}
           />
         ) : (
@@ -191,6 +197,21 @@ export default React.memo(function ProductCard({
             </Text>
           ) : null}
         </View>
+        {product.voucherPrice !== undefined && product.voucherCode ? (
+          <View style={styles.voucherPrice}>
+            <Text style={styles.voucherLabel} numberOfLines={1}>
+              Giá với mã {product.voucherCode}
+            </Text>
+            <Text style={styles.voucherAmount} numberOfLines={1}>
+              {product.voucherPrice.toLocaleString("vi-VN")}đ
+            </Text>
+            {product.voucherMinOrder ? (
+              <Text style={styles.voucherCondition} numberOfLines={1}>
+                Đơn từ {product.voucherMinOrder.toLocaleString("vi-VN")}đ
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         <Pressable
           style={({ pressed }) => [
@@ -365,9 +386,7 @@ const styles = StyleSheet.create({
     color: colors.gray,
   },
   priceRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 6,
+    alignItems: "flex-start",
     marginTop: 6,
   },
   price: {
@@ -378,7 +397,17 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.muted,
     textDecorationLine: "line-through",
+    marginTop: 2,
   },
+  voucherPrice: {
+    marginTop: spacing.px6,
+    padding: spacing.px6,
+    borderRadius: colors.radius.sm,
+    backgroundColor: colors.greenLight,
+  },
+  voucherLabel: { ...typography.micro, color: colors.gray },
+  voucherAmount: { ...typography.smallStrong, color: colors.green },
+  voucherCondition: { ...typography.micro, color: colors.gray, marginTop: 2 },
   addButton: {
     marginTop: spacing.px10,
     height: 38,

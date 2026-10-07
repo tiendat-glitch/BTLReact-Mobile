@@ -275,7 +275,8 @@ export default function ProductDetailScreen({ route, navigation }) {
             alt={item.name}
             aspectRatio={1}
             backgroundColor={colors.surfaceMuted}
-          />          {hasDiscount ? (
+          />
+          {hasDiscount ? (
             <View style={styles.discount}>
               <Text style={styles.discountText}>
                 -{Math.round(((item.oldPrice - item.price) / item.oldPrice) * 100)}%
@@ -306,6 +307,21 @@ export default function ProductDetailScreen({ route, navigation }) {
           ) : null}
 
           <PriceText price={item.price} oldPrice={item.oldPrice} size="lg" emphasize />
+          {item.voucherPrice !== undefined && item.voucherCode ? (
+            <View style={styles.voucherPrice}>
+              <Text style={styles.voucherLabel}>
+                Giá dự kiến với mã {item.voucherCode}
+              </Text>
+              <Text style={styles.voucherAmount}>
+                {formatCurrency(item.voucherPrice)}
+              </Text>
+              {item.voucherMinOrder ? (
+                <Text style={styles.voucherCondition}>
+                  Áp dụng cho đơn từ {formatCurrency(item.voucherMinOrder)}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
 
           <View style={styles.divider} />
 
@@ -630,6 +646,15 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: spacing.px10,
   },
+  voucherPrice: {
+    marginTop: spacing.px8,
+    padding: spacing.px12,
+    borderRadius: colors.radius.md,
+    backgroundColor: colors.greenLight,
+  },
+  voucherLabel: { ...typography.caption, color: colors.gray },
+  voucherAmount: { ...typography.h3, color: colors.green, marginTop: 2 },
+  voucherCondition: { ...typography.caption, color: colors.gray, marginTop: 2 },
   ratingRow: {
     flexDirection: "row",
     alignItems: "center",

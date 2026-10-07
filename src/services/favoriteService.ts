@@ -1,4 +1,5 @@
 import type { CatalogProduct } from "../types/catalog";
+import { resolveImageUrl } from "../utils/imageUrl";
 import { apiDelete, apiGet, apiPost } from "./httpClient";
 
 type FavoriteRow = {
@@ -42,6 +43,7 @@ const adaptFavorite = (row: FavoriteRow): CatalogProduct => {
   const price = Number(row.price);
   const oldPrice = Number(row.compare_at_price || price);
   const stockQuantity = Number(row.stock_quantity);
+  const imageUrl = resolveImageUrl(row.thumbnail_url);
   return {
     id: String(row.id),
     variantId: String(row.variant_id),
@@ -57,8 +59,8 @@ const adaptFavorite = (row: FavoriteRow): CatalogProduct => {
     deliveryTime:
       stockQuantity > 0 ? `Còn ${stockQuantity} sản phẩm` : "Tạm hết hàng",
     emoji: categoryIcons[row.category_slug] || "⌁",
-    imageUrl: row.thumbnail_url,
-    images: row.thumbnail_url ? [row.thumbnail_url] : [],
+    imageUrl,
+    images: imageUrl ? [imageUrl] : [],
     sku: row.sku,
     variantName: row.variant_name,
     description: row.description || "Chưa có mô tả sản phẩm.",

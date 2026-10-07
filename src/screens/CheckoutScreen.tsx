@@ -741,7 +741,12 @@ export default function CheckoutScreen({ navigation, route }) {
               <Text style={styles.bottomLabel} numberOfLines={1}>
                 Tổng thanh toán
               </Text>
-              <Text style={styles.total} numberOfLines={1}>
+              <Text
+                style={styles.total}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
                 {quote ? formatCurrency(quote.totalAmount) : "--"}
               </Text>
             </View>
@@ -801,7 +806,14 @@ function Summary({ label, value, bold }) {
       <Text style={[styles.muted, bold && styles.summaryLabelBold]}>
         {label}
       </Text>
-      <Text style={[styles.summaryValue, bold && styles.total]}>{value}</Text>
+      <Text
+        style={[styles.summaryValue, bold && styles.total]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -1179,7 +1191,12 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   summaryLabelBold: { ...typography.bodyStrong, color: colors.text },
-  summaryValue: { ...typography.caption, color: colors.text },
+  summaryValue: {
+    ...typography.caption,
+    color: colors.text,
+    flexShrink: 1,
+    textAlign: "right",
+  },
   bottomSafe: { backgroundColor: colors.white },
   bottom: {
     flexDirection: "row",
@@ -1195,6 +1212,12 @@ const styles = StyleSheet.create({
   },
   totalInfo: { flex: 1, minWidth: 0 },
   bottomLabel: { ...typography.caption, color: colors.gray },
-  total: { ...typography.priceLg, color: colors.primary, marginTop: 2 },
+  total: {
+    ...typography.priceLg,
+    color: colors.primary,
+    marginTop: 2,
+    flexShrink: 1,
+    textAlign: "right",
+  },
   cta: { flexShrink: 0, minWidth: 160 },
 });
