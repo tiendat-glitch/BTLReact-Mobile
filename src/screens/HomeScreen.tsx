@@ -7,7 +7,7 @@
 //   5. Category rail (pill tròn)
 //   6. Sản phẩm nổi bật (grid 2 cột)
 //   7. CTA banner xây dựng PC
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -17,6 +17,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Bell from "lucide-react-native/icons/bell";
 import ShoppingCart from "lucide-react-native/icons/shopping-cart";
@@ -44,8 +45,10 @@ import shadows from "../constants/shadows";
 import spacing, { contentInset } from "../constants/spacing";
 import typography from "../constants/typography";
 import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
 import useCompareAction from "../hooks/useCompareAction";
 import usePaginatedCatalog from "../hooks/usePaginatedCatalog";
+import { getUnreadNotificationCount } from "../services/notificationService";
 import { EMPTY_FILTER } from "../types/specFilter";
 import { getPromotions } from "../services/promotionService";
 import { getCatalogCategories } from "../services/catalogApiService";
@@ -94,6 +97,7 @@ export default function HomeScreen({ navigation }: any) {
   const [query, setQuery] = useState("");
   const [promotions, setPromotions] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   // Home chỉ cần 1 page để gợi ý; danh sách đầy đủ nằm ở Catalog.
   // Pagination giúp tránh tải toàn bộ 422 sản phẩm khi mở app.
@@ -106,10 +110,35 @@ export default function HomeScreen({ navigation }: any) {
     refresh,
   } = usePaginatedCatalog("", "all", EMPTY_FILTER);
   const { cartCount, addToCart } = useCart();
+  const { isAuthenticated } = useAuth();
   const compare = useCompareAction();
   const featuredProducts = useMemo(
     () => products.slice(0, 8),
     [products],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (!isAuthenticated) {
+        setUnreadNotificationCount(0);
+        return () => {
+          active = false;
+        };
+      }
+
+      getUnreadNotificationCount()
+        .then((count) => {
+          if (active) setUnreadNotificationCount(count);
+        })
+        .catch((error) => {
+          console.error("Không thể tải số thông báo chưa đọc:", error);
+        });
+
+      return () => {
+        active = false;
+      };
+    }, [isAuthenticated]),
   );
 
   useEffect(() => {
@@ -176,9 +205,22 @@ export default function HomeScreen({ navigation }: any) {
                 pressed ? styles.pressed : null,
               ]}
               accessibilityRole="button"
-              accessibilityLabel="Thông báo"
+              accessibilityLabel={
+                unreadNotificationCount > 0
+                  ? `Thông báo, ${unreadNotificationCount} chưa đọc`
+                  : "Thông báo"
+              }
             >
               <Bell color={colors.text} size={20} strokeWidth={2.2} />
+              {unreadNotificationCount > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadNotificationCount > 99
+                      ? "99+"
+                      : unreadNotificationCount}
+                  </Text>
+                </View>
+              ) : null}
             </Pressable>
             <Pressable
               onPress={() => navigation.navigate("Cart")}

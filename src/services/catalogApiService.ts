@@ -115,10 +115,12 @@ export async function getCatalogPage(params: {
 export async function getCatalogFacets(params: {
   category?: string;
   query?: string;
+  filter?: SpecFilter;
 }): Promise<CatalogFacets | null> {
   const search = [
     params.category ? `category=${encodeURIComponent(params.category)}` : "",
     params.query ? `q=${encodeURIComponent(params.query)}` : "",
+    buildFilterParams(params.filter),
   ]
     .filter(Boolean)
     .join("&");

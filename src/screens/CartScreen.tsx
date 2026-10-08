@@ -277,7 +277,12 @@ export default function CartScreen({ navigation }: any) {
               <Text style={styles.totalLabel} numberOfLines={1}>
                 Tạm tính
               </Text>
-              <Text style={styles.total} numberOfLines={1}>
+              <Text
+                style={styles.total}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
                 {formatCurrency(subtotal)}
               </Text>
             </View>
@@ -446,9 +451,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   itemPriceRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
+    alignItems: "flex-start",
     marginTop: 6,
   },
   itemPrice: {
@@ -459,6 +462,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.muted,
     textDecorationLine: "line-through",
+    marginTop: 2,
   },
   itemFooter: {
     flexDirection: "row",
@@ -617,6 +621,7 @@ const styles = StyleSheet.create({
     ...typography.priceLg,
     color: colors.primary,
     marginTop: 2,
+    flexShrink: 1,
   },
   checkoutBtn: { flexShrink: 0, minWidth: 140 },
 });

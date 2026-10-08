@@ -4,7 +4,7 @@ export type Warranty = {
   id: number;
   order_item_id: number;
   product_variant_id: number | null;
-  serial_number: string;
+  serial_number: string | null;
   start_date: string;
   end_date: string;
   status: "ACTIVE" | "EXPIRED" | "CLAIMED";

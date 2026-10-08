@@ -24,6 +24,7 @@ import colors from "../constants/colors";
 import spacing from "../constants/spacing";
 import typography from "../constants/typography";
 import type { CatalogFacets, FacetGroup, SpecFilter } from "../types/specFilter";
+import { getCatalogFacets } from "../services/catalogApiService";
 import {
   EMPTY_FILTER,
   countActiveFilterGroups,
@@ -34,6 +35,8 @@ type Props = {
   visible: boolean;
   facets: CatalogFacets | null;
   initial: SpecFilter;
+  category?: string;
+  query?: string;
   onClose: () => void;
   onApply: (next: SpecFilter) => void;
   maxHeightRatio?: number;
@@ -81,26 +84,51 @@ export default function SpecFilterSheet({
   visible,
   facets,
   initial,
+  category,
+  query,
   onClose,
   onApply,
   maxHeightRatio,
 }: Props) {
   const [draft, setDraft] = useState<SpecFilter>(initial);
+  const [visibleFacets, setVisibleFacets] = useState<CatalogFacets | null>(facets);
 
   useEffect(() => {
     if (visible) {
       setDraft(initial);
+      setVisibleFacets(facets);
     }
-  }, [visible, initial]);
+  }, [visible, initial, facets]);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    let active = true;
+    const timeout = setTimeout(() => {
+      getCatalogFacets({ category, query, filter: draft })
+        .then((nextFacets) => {
+          if (!active || !nextFacets) return;
+          setVisibleFacets(nextFacets);
+        })
+        .catch((error) => {
+          console.error("Không thể cập nhật lựa chọn bộ lọc:", error);
+        });
+    }, 180);
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [visible, category, query, draft]);
 
   const activeCount = countActiveFilterGroups(draft);
   const canReset = !isFilterEmpty(draft);
 
   const updateList = (key: keyof SpecFilter) => (value: string) => {
-    setDraft((current) => ({
-      ...current,
-      [key]: toggleValue(current[key] as string[] | undefined, value),
-    }));
+    setDraft((current) => {
+      return {
+        ...current,
+        [key]: toggleValue(current[key] as string[] | undefined, value),
+      };
+    });
   };
 
   const updatePrice = (next: { min: number | null; max: number | null }) => {
@@ -173,70 +201,70 @@ export default function SpecFilterSheet({
           />
         </FilterSection>
 
-        {hasGroup(facets?.brand) || (draft.brand || []).length > 0 ? (
+        {hasGroup(visibleFacets?.brand) || (draft.brand || []).length > 0 ? (
           <FilterSection
             title="Thương hiệu"
             selectedCount={(draft.brand || []).length}
           >
-            {renderGroup(facets?.brand, draft.brand, updateList("brand"))}
+            {renderGroup(visibleFacets?.brand, draft.brand, updateList("brand"))}
           </FilterSection>
         ) : null}
 
-        {hasGroup(facets?.cpu) || (draft.cpu || []).length > 0 ? (
+        {hasGroup(visibleFacets?.cpu) || (draft.cpu || []).length > 0 ? (
           <FilterSection
             title="CPU"
             selectedCount={(draft.cpu || []).length}
             scroll
           >
-            {renderGroup(facets?.cpu, draft.cpu, updateList("cpu"))}
+            {renderGroup(visibleFacets?.cpu, draft.cpu, updateList("cpu"))}
           </FilterSection>
         ) : null}
 
-        {hasGroup(facets?.ram) || (draft.ram || []).length > 0 ? (
+        {hasGroup(visibleFacets?.ram) || (draft.ram || []).length > 0 ? (
           <FilterSection
             title="RAM"
             selectedCount={(draft.ram || []).length}
             scroll
           >
-            {renderGroup(facets?.ram, draft.ram, updateList("ram"))}
+            {renderGroup(visibleFacets?.ram, draft.ram, updateList("ram"))}
           </FilterSection>
         ) : null}
 
-        {hasGroup(facets?.storage) || (draft.storage || []).length > 0 ? (
+        {hasGroup(visibleFacets?.storage) || (draft.storage || []).length > 0 ? (
           <FilterSection
             title="Ổ cứng / SSD"
             selectedCount={(draft.storage || []).length}
             scroll
           >
-            {renderGroup(facets?.storage, draft.storage, updateList("storage"))}
+            {renderGroup(visibleFacets?.storage, draft.storage, updateList("storage"))}
           </FilterSection>
         ) : null}
 
-        {hasGroup(facets?.gpu) || (draft.gpu || []).length > 0 ? (
+        {hasGroup(visibleFacets?.gpu) || (draft.gpu || []).length > 0 ? (
           <FilterSection
             title="Card đồ hoạ (GPU)"
             selectedCount={(draft.gpu || []).length}
             scroll
           >
-            {renderGroup(facets?.gpu, draft.gpu, updateList("gpu"))}
+            {renderGroup(visibleFacets?.gpu, draft.gpu, updateList("gpu"))}
           </FilterSection>
         ) : null}
 
-        {hasGroup(facets?.screenSize) || (draft.screenSize || []).length > 0 ? (
+        {hasGroup(visibleFacets?.screenSize) || (draft.screenSize || []).length > 0 ? (
           <FilterSection
             title="Kích thước màn hình"
             selectedCount={(draft.screenSize || []).length}
             scroll
           >
             {renderGroup(
-              facets?.screenSize,
+              visibleFacets?.screenSize,
               draft.screenSize,
               updateList("screenSize"),
             )}
           </FilterSection>
         ) : null}
 
-        {hasGroup(facets?.refreshRate) ||
+        {hasGroup(visibleFacets?.refreshRate) ||
         (draft.refreshRate || []).length > 0 ? (
           <FilterSection
             title="Tần số quét"
@@ -244,7 +272,7 @@ export default function SpecFilterSheet({
             scroll
           >
             {renderGroup(
-              facets?.refreshRate,
+              visibleFacets?.refreshRate,
               draft.refreshRate,
               updateList("refreshRate"),
             )}

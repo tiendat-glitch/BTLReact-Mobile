@@ -25,6 +25,17 @@ export async function getNotifications(page = 1): Promise<unknown[]> {
   return unwrapList(payload);
 }
 
+export async function getUnreadNotificationCount(): Promise<number> {
+  const { data } = await apiGet<{
+    data?: { count?: number | string };
+  }>("/notifications/unread-count");
+  const count = Number(data?.data?.count);
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error("Số thông báo chưa đọc không hợp lệ.");
+  }
+  return count;
+}
+
 export async function markNotificationRead(id: number | string): Promise<void> {
   await apiPatch(`/notifications/${id}/read`, {});
 }
@@ -35,6 +46,7 @@ export async function markAllNotificationsRead(): Promise<void> {
 
 export default {
   getNotifications,
+  getUnreadNotificationCount,
   markNotificationRead,
   markAllNotificationsRead,
 };

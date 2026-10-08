@@ -34,7 +34,6 @@ import { cacheProduct } from "../services/productCache";
 import {
   EMPTY_FILTER,
   countActiveFilterGroups,
-  isFilterEmpty,
   type SpecFilter,
 } from "../types/specFilter";
 
@@ -133,7 +132,10 @@ export default function CatalogScreen({ navigation, route }: any) {
         keyExtractor={(item) => item.variantId}
         numColumns={2}
         columnWrapperStyle={styles.columns}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          filteredProducts.length === 0 && styles.emptyContent,
+        ]}
         refreshing={catalog.isRefreshing}
         onRefresh={catalog.refresh}
         onEndReachedThreshold={0.01}
@@ -237,15 +239,14 @@ export default function CatalogScreen({ navigation, route }: any) {
         }
         ListEmptyComponent={
           !catalog.isLoading ? (
-            <FeedbackState
-              variant="empty"
-              title="Không có sản phẩm phù hợp"
-              description={
-                isFilterEmpty(filter)
-                  ? "Thử từ khoá ngắn hơn hoặc chọn danh mục khác."
-                  : "Bỏ bớt tiêu chí lọc để thấy thêm sản phẩm."
-              }
-            />
+            <View style={styles.emptyResults}>
+              <FeedbackState
+                variant="empty"
+                title="Không có sản phẩm phù hợp nhu cầu của bạn"
+                description="Thử bỏ bớt bộ lọc hoặc đổi từ khóa để xem thêm sản phẩm."
+                fullScreen
+              />
+            </View>
           ) : null
         }
       />
@@ -254,6 +255,8 @@ export default function CatalogScreen({ navigation, route }: any) {
         visible={filterVisible}
         facets={catalog.facets}
         initial={filter}
+        category={category === "all" ? "" : category}
+        query={query}
         onClose={() => setFilterVisible(false)}
         onApply={handleApplyFilter}
         maxHeightRatio={0.78}
@@ -400,6 +403,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.px4,
     paddingBottom: spacing.px56,
   },
+  emptyContent: { flexGrow: 1, backgroundColor: colors.white },
+  emptyResults: { flex: 1, backgroundColor: colors.white },
   headerWrap: {
     paddingHorizontal: spacing.px16,
   },

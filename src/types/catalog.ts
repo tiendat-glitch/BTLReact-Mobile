@@ -26,5 +26,7 @@ export type CatalogProduct = {
   description: string;
   specs: string[];
   warrantyMonths: number;
+  voucherPrice?: number;
+  voucherCode?: string;
+  voucherMinOrder?: number;
 };
-

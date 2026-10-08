@@ -1,4 +1,5 @@
 import type { CatalogCategory, CatalogProduct } from "../types/catalog";
+import { resolveImageUrl } from "../utils/imageUrl";
 
 const CATEGORY_ICONS: Record<string, string> = {
   laptop: "💻",
@@ -42,19 +43,18 @@ const toStringArray = (value: unknown): string[] => {
 
 const collectImages = (row: Record<string, unknown>): string[] => {
   const list: string[] = [];
-  const thumbnail = row.thumbnail_url;
-  if (typeof thumbnail === "string" && thumbnail.length > 0) {
-    list.push(thumbnail);
+  const append = (entries: string[]) => {
+    entries.forEach((entry) => {
+      const imageUrl = resolveImageUrl(entry);
+      if (imageUrl && !list.includes(imageUrl)) list.push(imageUrl);
+    });
+  };
+  append(toStringArray(row.product_images));
+  if (typeof row.thumbnail_url === "string") {
+    append([row.thumbnail_url]);
   }
-  toStringArray(row.images).forEach((entry) => {
-    if (!list.includes(entry)) list.push(entry);
-  });
-  toStringArray(row.product_images).forEach((entry) => {
-    if (!list.includes(entry)) list.push(entry);
-  });
-  toStringArray(row.gallery).forEach((entry) => {
-    if (!list.includes(entry)) list.push(entry);
-  });
+  append(toStringArray(row.images));
+  append(toStringArray(row.gallery));
   return list;
 };
 
@@ -110,6 +110,7 @@ export function adaptCatalogRows(rows: unknown[] = []): CatalogProduct[] {
     const price = toNumber(row.price);
     const compareAtPrice = toNumber(row.compare_at_price, price);
     const stockQuantity = toNumber(row.stock_quantity);
+    const images = collectImages(row);
     return {
       id: String(row.id ?? ""),
       variantId: String(row.variant_id ?? ""),
@@ -125,8 +126,8 @@ export function adaptCatalogRows(rows: unknown[] = []): CatalogProduct[] {
       deliveryTime:
         stockQuantity > 0 ? `Còn ${stockQuantity} sản phẩm` : "Tạm hết hàng",
       emoji: getCategoryIcon({ slug: row.category_slug as string | undefined }),
-      imageUrl: typeof row.thumbnail_url === "string" ? row.thumbnail_url : null,
-      images: collectImages(row),
+      imageUrl: images[0] || null,
+      images,
       sku: typeof row.sku === "string" ? row.sku : "",
       variantName: typeof row.variant_name === "string" ? row.variant_name : "",
       description:
@@ -135,6 +136,16 @@ export function adaptCatalogRows(rows: unknown[] = []): CatalogProduct[] {
           : "Chưa có mô tả sản phẩm.",
       specs: getVariantSpecs(row),
       warrantyMonths: toNumber(row.warranty_months, 12),
+      voucherPrice:
+        row.voucher_discounted_price == null
+          ? undefined
+          : toNumber(row.voucher_discounted_price),
+      voucherCode:
+        typeof row.voucher_code === "string" ? row.voucher_code : undefined,
+      voucherMinOrder:
+        row.voucher_min_order_value == null
+          ? undefined
+          : toNumber(row.voucher_min_order_value),
     };
   });
 }
@@ -184,6 +195,7 @@ export function adaptCatalog(input: AdaptInput = {}): {
       const price = toNumber(variant.price);
       const compareAtPrice = toNumber(variant.compare_at_price, price);
       const stockQuantity = toNumber(variant.stock_quantity);
+      const images = collectImages(product);
       const item: CatalogProduct = {
         id: String(product.id),
         variantId: String(variant.id),
@@ -199,11 +211,8 @@ export function adaptCatalog(input: AdaptInput = {}): {
         deliveryTime:
           stockQuantity > 0 ? `Còn ${stockQuantity} sản phẩm` : "Tạm hết hàng",
         emoji: getCategoryIcon(category),
-        imageUrl:
-          typeof product.thumbnail_url === "string"
-            ? product.thumbnail_url
-            : null,
-        images: collectImages(product),
+        imageUrl: images[0] || null,
+        images,
         sku: typeof variant.sku === "string" ? variant.sku : "",
         variantName:
           typeof variant.variant_name === "string" ? variant.variant_name : "",
@@ -213,6 +222,9 @@ export function adaptCatalog(input: AdaptInput = {}): {
             : "Chưa có mô tả sản phẩm.",
         specs: getVariantSpecs(variant),
         warrantyMonths: toNumber(variant.warranty_months, 12),
+        voucherPrice: undefined,
+        voucherCode: undefined,
+        voucherMinOrder: undefined,
       };
       return item;
     })
